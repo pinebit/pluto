@@ -1,4 +1,3 @@
-
 //! # Charon CLI
 //!
 //! Command-line interface for the Charon distributed validator node.

@@ -1,8 +1,8 @@
 //! # Charon ETH2
 //!
-//! Ethereum 2.0 integration and utilities for the Charon distributed validator node.
-//! This crate provides interfaces, types, and utilities for interacting with
-//! Ethereum 2.0 networks and validator operations.
+//! Ethereum 2.0 integration and utilities for the Charon distributed validator
+//! node. This crate provides interfaces, types, and utilities for interacting
+//! with Ethereum 2.0 networks and validator operations.
 
 /// Adds two numbers together.
 ///

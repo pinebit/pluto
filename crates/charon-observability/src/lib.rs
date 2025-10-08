@@ -1,8 +1,8 @@
 //! # Charon Observability
 //!
-//! Observability and monitoring utilities for the Charon distributed validator node.
-//! This crate provides logging, metrics, tracing, and monitoring capabilities
-//! for tracking and debugging validator operations.
+//! Observability and monitoring utilities for the Charon distributed validator
+//! node. This crate provides logging, metrics, tracing, and monitoring
+//! capabilities for tracking and debugging validator operations.
 
 /// Adds two numbers together.
 ///

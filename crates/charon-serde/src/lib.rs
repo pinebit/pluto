@@ -1,8 +1,9 @@
 //! # Charon Serde
 //!
-//! Serialization and deserialization utilities for the Charon distributed validator node.
-//! This crate provides custom serialization logic, format support, and data
-//! transformation utilities for validator operations and communication.
+//! Serialization and deserialization utilities for the Charon distributed
+//! validator node. This crate provides custom serialization logic, format
+//! support, and data transformation utilities for validator operations and
+//! communication.
 
 /// Adds two numbers together.
 ///

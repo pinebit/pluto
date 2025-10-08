@@ -1,8 +1,9 @@
 //! # Charon P2P
 //!
-//! Peer-to-peer networking and communication for the Charon distributed validator node.
-//! This crate provides networking protocols, peer discovery, and communication
-//! mechanisms for validator nodes to coordinate and exchange information.
+//! Peer-to-peer networking and communication for the Charon distributed
+//! validator node. This crate provides networking protocols, peer discovery,
+//! and communication mechanisms for validator nodes to coordinate and exchange
+//! information.
 
 /// Adds two numbers together.
 ///

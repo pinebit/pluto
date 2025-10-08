@@ -1,8 +1,8 @@
 //! # Charon Errors
 //!
-//! Error types and error handling utilities for the Charon distributed validator node.
-//! This crate defines the error types, error codes, and error handling mechanisms
-//! used throughout the Charon system.
+//! Error types and error handling utilities for the Charon distributed
+//! validator node. This crate defines the error types, error codes, and error
+//! handling mechanisms used throughout the Charon system.
 
 /// Adds two numbers together.
 ///

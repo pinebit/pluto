@@ -1,8 +1,9 @@
 //! # Charon DKG
 //!
-//! Distributed Key Generation (DKG) protocols for Charon distributed validator nodes.
-//! This crate implements the cryptographic protocols required for generating,
-//! distributing, and managing validator keys across the distributed network.
+//! Distributed Key Generation (DKG) protocols for Charon distributed validator
+//! nodes. This crate implements the cryptographic protocols required for
+//! generating, distributing, and managing validator keys across the distributed
+//! network.
 
 /// Adds two numbers together.
 ///
