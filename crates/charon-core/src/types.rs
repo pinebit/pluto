@@ -380,13 +380,22 @@ pub struct UnsignedDataSet<T>(HashMap<DutyType, UnsignedData<T>>)
 where
     T: Clone + Serialize + StdDebug;
 
+impl<T> Default for UnsignedDataSet<T>
+where
+    T: Clone + Serialize + StdDebug,
+{
+    fn default() -> Self {
+        Self(HashMap::default())
+    }
+}
+
 impl<T> UnsignedDataSet<T>
 where
     T: Clone + Serialize + StdDebug,
 {
     /// Create a new unsigned data set.
     pub fn new() -> Self {
-        Self(HashMap::default())
+        Self::default()
     }
 
     /// Get an unsigned data by duty type.
@@ -475,13 +484,22 @@ where
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParSignedDataSet<T: SignedData>(HashMap<PubKey, ParSignedData<T>>);
 
+impl<T> Default for ParSignedDataSet<T>
+where
+    T: SignedData,
+{
+    fn default() -> Self {
+        Self(HashMap::default())
+    }
+}
+
 impl<T> ParSignedDataSet<T>
 where
     T: SignedData,
 {
     /// Create a new partially signed data set.
     pub fn new() -> Self {
-        Self(HashMap::default())
+        Self::default()
     }
 
     /// Get a partially signed data by public key.
@@ -514,13 +532,22 @@ where
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SignedDataSet<T: SignedData>(HashMap<PubKey, T>);
 
+impl<T> Default for SignedDataSet<T>
+where
+    T: SignedData,
+{
+    fn default() -> Self {
+        Self(HashMap::default())
+    }
+}
+
 impl<T> SignedDataSet<T>
 where
     T: SignedData,
 {
     /// Create a new signed data set.
     pub fn new() -> Self {
-        Self(HashMap::default())
+        Self::default()
     }
 
     /// Get a signed data by public key.
@@ -859,7 +886,14 @@ mod tests {
     fn test_pub_key_from_string() {
         let pk_str = "0x7f790ba343adf8891fac21a94b02d6ca93d0bc2199a5ec083ff6676e8c2f9f78b08bb122f1093675f9d24c8b5e7af241".to_string();
         let pk = PubKey::try_from(pk_str).unwrap();
-        assert_eq!(pk, PubKey::new([127, 121, 11, 163, 67, 173, 248, 137, 31, 172, 33, 169, 75, 2, 214, 202, 147, 208, 188, 33, 153, 165, 236, 8, 63, 246, 103, 110, 140, 47, 159, 120, 176, 139, 177, 34, 241, 9, 54, 117, 249, 210, 76, 139, 94, 122, 242, 65]));
+        assert_eq!(
+            pk,
+            PubKey::new([
+                127, 121, 11, 163, 67, 173, 248, 137, 31, 172, 33, 169, 75, 2, 214, 202, 147, 208,
+                188, 33, 153, 165, 236, 8, 63, 246, 103, 110, 140, 47, 159, 120, 176, 139, 177, 34,
+                241, 9, 54, 117, 249, 210, 76, 139, 94, 122, 242, 65
+            ])
+        );
     }
 
     #[test]
