@@ -55,6 +55,13 @@ impl Display for DutyType {
     }
 }
 
+impl DutyType {
+    /// Returns true if the duty type is valid.
+    pub fn is_valid(&self) -> bool {
+        !matches!(self, DutyType::Unknown | DutyType::DutySentinel(_))
+    }
+}
+
 /// SlotNumber struct
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct SlotNumber(u64);
@@ -535,5 +542,16 @@ mod tests {
         );
         assert_eq!(DutyType::SyncContribution.to_string(), "sync_contribution");
         assert_eq!(DutyType::InfoSync.to_string(), "info_sync");
+    }
+
+    #[test]
+    fn test_duty_type_is_valid() {
+        assert!(!DutyType::Unknown.is_valid());
+        assert!(DutyType::Proposer.is_valid());
+        assert!(DutyType::Attester.is_valid());
+        assert!(DutyType::Signature.is_valid());
+        assert!(DutyType::Exit.is_valid());
+        assert!(!DutyType::DutySentinel(Box::new(DutyType::Unknown)).is_valid());
+        assert!(!DutyType::DutySentinel(Box::new(DutyType::Attester)).is_valid());
     }
 }
