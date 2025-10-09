@@ -1,8 +1,8 @@
 //! Types for the Charon core.
 
-use std::{collections::HashMap, fmt::Display, iter, time::Duration};
+use std::{collections::HashMap, fmt::Display, iter};
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug as StdDebug;
 
@@ -132,6 +132,11 @@ impl Duty {
         Self::new(slot, DutyType::Randao)
     }
 
+    /// Create a new voluntary exit duty.
+    pub fn new_voluntary_exit_duty(slot: SlotNumber) -> Self {
+        Self::new(slot, DutyType::Exit)
+    }
+
     /// Create a new proposer duty.
     pub fn new_proposer_duty(slot: SlotNumber) -> Self {
         Self::new(slot, DutyType::Proposer)
@@ -199,7 +204,7 @@ pub enum ProposalType {
 // We use pk_len = 48, which is [48 bytes], the main difference is that we store
 // the pub key as [u8; 48] instead of string.
 const PK_LEN: usize = 48;
-// const SIG_LEN: usize = 96;
+const SIG_LEN: usize = 96;
 
 /// Public key struct
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -211,6 +216,15 @@ impl Serialize for PubKey {
         S: serde::Serializer,
     {
         serializer.serialize_str(&self.to_string())
+    }
+}
+
+impl TryFrom<String> for PubKey {
+    type Error = PubKeyError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        let value = value.strip_prefix("0x").unwrap_or(&value);
+        PubKey::from_bytes(&hex::decode(value).map_err(|_| PubKeyError::InvalidString)?)
     }
 }
 
@@ -244,10 +258,35 @@ impl From<[u8; PK_LEN]> for PubKey {
     }
 }
 
+/// Public key error type
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PubKeyError {
+    /// Invalid public key length.
+    InvalidLength,
+    /// Invalid public key string.
+    InvalidString,
+}
+
 impl PubKey {
     /// Create a new public key.
     pub fn new(pk: [u8; PK_LEN]) -> Self {
         PubKey(pk)
+    }
+
+    /// Create a new public key from bytes.
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, PubKeyError> {
+        if bytes.len() != PK_LEN {
+            return Err(PubKeyError::InvalidLength);
+        }
+        let mut arr = [0u8; PK_LEN];
+        arr.copy_from_slice(bytes);
+        Ok(PubKey(arr))
+    }
+
+    /// Returns logging-friendly abbreviated form: "b82_97f"
+    pub fn abbreviated(&self) -> String {
+        let hex = hex::encode(self.0);
+        format!("{}_{}", &hex[0..3], &hex[93..96])
     }
 }
 
@@ -271,26 +310,122 @@ impl AsRef<[u8]> for PubKey {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DutyDefinition<T: Clone + Serialize + StdDebug>(T);
 
+impl<T> DutyDefinition<T>
+where
+    T: Clone + Serialize + StdDebug,
+{
+    /// Create a new duty definition.
+    pub fn new(duty_definition: T) -> Self {
+        Self(duty_definition)
+    }
+}
+
 /// Duty definition set
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct DutyDefinitionSet<T>(HashMap<DutyType, DutyDefinition<T>>)
 where
     T: Clone + Serialize + StdDebug;
+
+impl<T> DutyDefinitionSet<T>
+where
+    T: Clone + Serialize + StdDebug,
+{
+    /// Create a new duty definition set.
+    pub fn new() -> Self {
+        Self(HashMap::default())
+    }
+
+    /// Get a duty definition by duty type.
+    pub fn get(&self, duty_type: &DutyType) -> Option<&DutyDefinition<T>> {
+        self.0.get(duty_type)
+    }
+
+    /// Insert a duty definition.
+    pub fn insert(&mut self, duty_type: DutyType, duty_definition: DutyDefinition<T>) {
+        self.0.insert(duty_type, duty_definition);
+    }
+
+    /// Remove a duty definition by duty type.
+    pub fn remove(&mut self, duty_type: &DutyType) -> Option<DutyDefinition<T>> {
+        self.0.remove(duty_type)
+    }
+
+    /// Inner duty definition set.
+    pub fn inner(&self) -> &HashMap<DutyType, DutyDefinition<T>> {
+        &self.0
+    }
+
+    /// Inner duty definition set.
+    pub fn inner_mut(&mut self) -> &mut HashMap<DutyType, DutyDefinition<T>> {
+        &mut self.0
+    }
+}
 
 /// Unsigned data type
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnsignedData<T: Clone + Serialize + StdDebug>(T);
 
+impl<T> UnsignedData<T>
+where
+    T: Clone + Serialize + StdDebug,
+{
+    /// Create a new unsigned data.
+    pub fn new(unsigned_data: T) -> Self {
+        Self(unsigned_data)
+    }
+}
 /// Unsigned data set
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnsignedDataSet<T>(HashMap<DutyType, UnsignedData<T>>)
 where
     T: Clone + Serialize + StdDebug;
 
+impl<T> UnsignedDataSet<T>
+where
+    T: Clone + Serialize + StdDebug,
+{
+    /// Create a new unsigned data set.
+    pub fn new() -> Self {
+        Self(HashMap::default())
+    }
+
+    /// Get an unsigned data by duty type.
+    pub fn get(&self, duty_type: &DutyType) -> Option<&UnsignedData<T>> {
+        self.0.get(duty_type)
+    }
+
+    /// Insert an unsigned data.
+    pub fn insert(&mut self, duty_type: DutyType, unsigned_data: UnsignedData<T>) {
+        self.0.insert(duty_type, unsigned_data);
+    }
+
+    /// Remove an unsigned data by duty type.
+    pub fn remove(&mut self, duty_type: &DutyType) -> Option<UnsignedData<T>> {
+        self.0.remove(duty_type)
+    }
+
+    /// Inner unsigned data set.
+    pub fn inner(&self) -> &HashMap<DutyType, UnsignedData<T>> {
+        &self.0
+    }
+
+    /// Inner unsigned data set.
+    pub fn inner_mut(&mut self) -> &mut HashMap<DutyType, UnsignedData<T>> {
+        &mut self.0
+    }
+}
+
 // todo: add proper signature type
 /// Signature type
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Signature(pub(crate) [u8; 1]);
+pub struct Signature(pub(crate) [u8; SIG_LEN]);
+
+impl Signature {
+    /// Create a new signature.
+    pub fn new(signature: [u8; SIG_LEN]) -> Self {
+        Signature(signature)
+    }
+}
 
 /// Signed data type
 pub trait SignedData: Clone + Serialize + StdDebug {
@@ -322,14 +457,97 @@ pub struct ParSignedData<T: SignedData> {
     pub share_idx: u64,
 }
 
+impl<T> ParSignedData<T>
+where
+    T: SignedData,
+{
+    /// Create a new partially signed data.
+    pub fn new(partially_signed_data: T, share_idx: u64) -> Self {
+        Self {
+            signed_data: partially_signed_data,
+            share_idx,
+        }
+    }
+}
+
 /// ParSignedDataSet is a set of partially signed duty data only signed by a
 /// single threshold BLS share.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParSignedDataSet<T: SignedData>(HashMap<PubKey, ParSignedData<T>>);
 
+impl<T> ParSignedDataSet<T>
+where
+    T: SignedData,
+{
+    /// Create a new partially signed data set.
+    pub fn new() -> Self {
+        Self(HashMap::default())
+    }
+
+    /// Get a partially signed data by public key.
+    pub fn get(&self, pub_key: &PubKey) -> Option<&ParSignedData<T>> {
+        self.inner().get(pub_key)
+    }
+
+    /// Insert a partially signed data.
+    pub fn insert(&mut self, pub_key: PubKey, partially_signed_data: ParSignedData<T>) {
+        self.inner_mut().insert(pub_key, partially_signed_data);
+    }
+
+    /// Remove a partially signed data by public key.
+    pub fn remove(&mut self, pub_key: &PubKey) -> Option<ParSignedData<T>> {
+        self.inner_mut().remove(pub_key)
+    }
+
+    /// Inner partially signed data set.
+    pub fn inner(&self) -> &HashMap<PubKey, ParSignedData<T>> {
+        &self.0
+    }
+
+    /// Inner partially signed data set.
+    pub fn inner_mut(&mut self) -> &mut HashMap<PubKey, ParSignedData<T>> {
+        &mut self.0
+    }
+}
+
 /// SignedDataSet is a set of signed duty data.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SignedDataSet<T: SignedData>(HashMap<PubKey, T>);
+
+impl<T> SignedDataSet<T>
+where
+    T: SignedData,
+{
+    /// Create a new signed data set.
+    pub fn new() -> Self {
+        Self(HashMap::default())
+    }
+
+    /// Get a signed data by public key.
+    pub fn get(&self, pub_key: &PubKey) -> Option<&T> {
+        self.0.get(pub_key)
+    }
+
+    /// Insert a signed data.
+    pub fn insert(&mut self, pub_key: PubKey, signed_data: T) {
+        self.0.insert(pub_key, signed_data);
+    }
+
+    /// Remove a signed data by public key.
+    pub fn remove(&mut self, pub_key: &PubKey) -> Option<T> {
+        self.0.remove(pub_key)
+    }
+
+    /// Inner signed data set.
+    pub fn inner(&self) -> &HashMap<PubKey, T> {
+        &self.0
+    }
+
+    /// Inner signed data set.
+    pub fn inner_mut(&mut self) -> &mut HashMap<PubKey, T> {
+        &mut self.0
+    }
+}
 
 /// Slot struct
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -472,7 +690,7 @@ mod tests {
         let slot = Slot {
             slot: SlotNumber(123),
             time: DateTime::from_timestamp(100, 100).unwrap(),
-            slot_duration: Duration::from_secs(4),
+            slot_duration: Duration::seconds(4),
             slots_per_epoch: 32,
         };
 
@@ -484,7 +702,7 @@ mod tests {
         let next = slot.next_slot();
         assert_eq!(next.slot, SlotNumber(124));
         assert_eq!(next.time, DateTime::from_timestamp(104, 100).unwrap());
-        assert_eq!(next.slot_duration, Duration::from_secs(4));
+        assert_eq!(next.slot_duration, Duration::seconds(4));
         assert_eq!(next.slots_per_epoch, 32);
     }
 
@@ -507,7 +725,7 @@ mod tests {
         let slot = Slot {
             slot: SlotNumber(123),
             time: DateTime::from_timestamp(100, 100).unwrap(),
-            slot_duration: Duration::from_secs(4),
+            slot_duration: Duration::seconds(4),
             slots_per_epoch: 32,
         };
 
@@ -553,5 +771,101 @@ mod tests {
         assert!(DutyType::Exit.is_valid());
         assert!(!DutyType::DutySentinel(Box::new(DutyType::Unknown)).is_valid());
         assert!(!DutyType::DutySentinel(Box::new(DutyType::Attester)).is_valid());
+    }
+
+    #[test]
+    fn test_pub_key_from_bytes() {
+        let bytes = [42u8; PK_LEN];
+        let pk = PubKey::from_bytes(&bytes).unwrap();
+        assert_eq!(pk, PubKey::new(bytes));
+    }
+
+    #[test]
+    fn test_pub_key_from_bytes_invalid_length() {
+        let bytes = [42u8; PK_LEN + 1];
+        let result = PubKey::from_bytes(&bytes);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_pub_key_abbreviated() {
+        let pk = PubKey::new([42u8; PK_LEN]);
+        assert_eq!(pk.abbreviated(), "2a2_a2a");
+    }
+
+    #[test]
+    fn test_duty_definition_set() {
+        let mut duty_definition_set = DutyDefinitionSet::new();
+        duty_definition_set.insert(DutyType::Proposer, DutyDefinition::new(DutyType::Proposer));
+        assert_eq!(
+            duty_definition_set.get(&DutyType::Proposer),
+            Some(&DutyDefinition::new(DutyType::Proposer))
+        );
+    }
+
+    #[test]
+    fn test_unsigned_data_set() {
+        let mut unsigned_data_set = UnsignedDataSet::new();
+        unsigned_data_set.insert(DutyType::Proposer, UnsignedData::new(DutyType::Proposer));
+        assert_eq!(
+            unsigned_data_set.get(&DutyType::Proposer),
+            Some(&UnsignedData::new(DutyType::Proposer))
+        );
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    struct MockSignedData;
+
+    impl SignedData for MockSignedData {
+        type Error = std::io::Error;
+
+        fn signature(&self) -> Signature {
+            Signature::new([42u8; SIG_LEN])
+        }
+
+        fn set_signature(&mut self, _signature: Signature) -> Result<(), std::io::Error> {
+            Ok(())
+        }
+
+        fn message_root(&self) -> [u8; 32] {
+            [42u8; 32]
+        }
+    }
+
+    #[test]
+    fn test_partially_signed_data_set() {
+        let mut partially_signed_data_set = ParSignedDataSet::new();
+        partially_signed_data_set.insert(
+            PubKey::new([42u8; PK_LEN]),
+            ParSignedData::new(MockSignedData, 0),
+        );
+        assert_eq!(
+            partially_signed_data_set.get(&PubKey::new([42u8; PK_LEN])),
+            Some(&ParSignedData::new(MockSignedData, 0))
+        );
+    }
+
+    #[test]
+    fn test_signed_data_set() {
+        let mut signed_data_set = SignedDataSet::new();
+        signed_data_set.insert(PubKey::new([42u8; PK_LEN]), MockSignedData);
+        assert_eq!(
+            signed_data_set.get(&PubKey::new([42u8; PK_LEN])),
+            Some(&MockSignedData)
+        );
+    }
+
+    #[test]
+    fn test_pub_key_from_string() {
+        let pk_str = "0x7f790ba343adf8891fac21a94b02d6ca93d0bc2199a5ec083ff6676e8c2f9f78b08bb122f1093675f9d24c8b5e7af241".to_string();
+        let pk = PubKey::try_from(pk_str).unwrap();
+        assert_eq!(pk, PubKey::new([127, 121, 11, 163, 67, 173, 248, 137, 31, 172, 33, 169, 75, 2, 214, 202, 147, 208, 188, 33, 153, 165, 236, 8, 63, 246, 103, 110, 140, 47, 159, 120, 176, 139, 177, 34, 241, 9, 54, 117, 249, 210, 76, 139, 94, 122, 242, 65]));
+    }
+
+    #[test]
+    fn test_pub_key_from_string_invalid_length() {
+        let pk_str = "0x7f790ba343adf8891fac21a94b02d6ca93d0bc2199a5ec083ff6676e8c2f9f78b08bb121093675f9d24c8b5e7af241".to_string();
+        let result = PubKey::try_from(pk_str);
+        assert!(result.is_err());
     }
 }
