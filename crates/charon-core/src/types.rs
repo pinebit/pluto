@@ -203,6 +203,7 @@ pub enum ProposalType {
 // In golang implementation they use pk_len = 98, which is 0x + [48 bytes]
 // We use pk_len = 48, which is [48 bytes], the main difference is that we store
 // the pub key as [u8; 48] instead of string.
+// [original implementation](https://github.com/ObolNetwork/charon/blob/b3008103c5429b031b63518195f4c49db4e9a68d/core/types.go#L264)
 const PK_LEN: usize = 48;
 const SIG_LEN: usize = 96;
 
@@ -224,7 +225,8 @@ impl TryFrom<String> for PubKey {
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         let value = value.strip_prefix("0x").unwrap_or(&value);
-        PubKey::from_bytes(&hex::decode(value).map_err(|_| PubKeyError::InvalidString)?)
+        let hex_value = hex::decode(value).map_err(|_| PubKeyError::InvalidString)?;
+        PubKey::try_from(hex_value.as_slice())
     }
 }
 
@@ -273,20 +275,23 @@ impl PubKey {
         PubKey(pk)
     }
 
-    /// Create a new public key from bytes.
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, PubKeyError> {
+    /// Returns logging-friendly abbreviated form: "b82_97f"
+    pub fn abbreviated(&self) -> String {
+        let hex = hex::encode(self.0);
+        format!("{}_{}", &hex[0..3], &hex[93..96])
+    }
+}
+
+impl TryFrom<&[u8]> for PubKey {
+    type Error = PubKeyError;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
         if bytes.len() != PK_LEN {
             return Err(PubKeyError::InvalidLength);
         }
         let mut arr = [0u8; PK_LEN];
         arr.copy_from_slice(bytes);
         Ok(PubKey(arr))
-    }
-
-    /// Returns logging-friendly abbreviated form: "b82_97f"
-    pub fn abbreviated(&self) -> String {
-        let hex = hex::encode(self.0);
-        format!("{}_{}", &hex[0..3], &hex[93..96])
     }
 }
 
@@ -803,14 +808,14 @@ mod tests {
     #[test]
     fn test_pub_key_from_bytes() {
         let bytes = [42u8; PK_LEN];
-        let pk = PubKey::from_bytes(&bytes).unwrap();
+        let pk = PubKey::try_from(&bytes[..]).unwrap();
         assert_eq!(pk, PubKey::new(bytes));
     }
 
     #[test]
     fn test_pub_key_from_bytes_invalid_length() {
         let bytes = [42u8; PK_LEN + 1];
-        let result = PubKey::from_bytes(&bytes);
+        let result = PubKey::try_from(&bytes[..]);
         assert!(result.is_err());
     }
 
