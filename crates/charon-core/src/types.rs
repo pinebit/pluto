@@ -742,7 +742,6 @@ mod tests {
     fn test_serialize_pubkey() {
         let pk = PubKey::new([42u8; PK_LEN]);
         let serialized = serde_json::to_string(&pk).unwrap();
-        println!("serialized: {}", serialized);
         assert_eq!(serialized, format!("\"0x{}\"", hex::encode([42u8; PK_LEN])));
     }
 
@@ -750,7 +749,6 @@ mod tests {
     fn test_deserialize_pubkey() {
         let serialized = format!("\"0x{}\"", hex::encode([42u8; PK_LEN]));
         let deserialized: PubKey = serde_json::from_str(&serialized).unwrap();
-        println!("deserialized: {}", deserialized);
         assert_eq!(deserialized, PubKey::new([42u8; PK_LEN]));
     }
 
