@@ -1,4 +1,5 @@
-// Copyright © 2022-2025 Obol Labs Inc. Licensed under the terms of a Business Source License 1.1
+// Copyright © 2022-2025 Obol Labs Inc. Licensed under the terms of a Business
+// Source License 1.1
 
 //! # Type Conversions for TBLS
 //!
@@ -11,8 +12,8 @@
 //! - Validation of byte lengths during conversions
 
 use crate::types::{
-    Error, PrivateKey, PublicKey, Signature, PRIVATE_KEY_LENGTH, PUBLIC_KEY_LENGTH,
-    SIGNATURE_LENGTH,
+    Error, PRIVATE_KEY_LENGTH, PUBLIC_KEY_LENGTH, PrivateKey, PublicKey, SIGNATURE_LENGTH,
+    Signature,
 };
 
 /// Converts a byte slice into a `PrivateKey`.
@@ -27,7 +28,8 @@ use crate::types::{
 ///
 /// # Errors
 ///
-/// Returns an error if the data length doesn't match the expected private key length (32 bytes).
+/// Returns an error if the data length doesn't match the expected private key
+/// length (32 bytes).
 ///
 /// # Examples
 ///
@@ -62,7 +64,8 @@ pub fn privkey_from_bytes(data: &[u8]) -> Result<PrivateKey, Error> {
 ///
 /// # Errors
 ///
-/// Returns an error if the data length doesn't match the expected public key length (48 bytes).
+/// Returns an error if the data length doesn't match the expected public key
+/// length (48 bytes).
 ///
 /// # Examples
 ///
@@ -97,7 +100,8 @@ pub fn pubkey_from_bytes(data: &[u8]) -> Result<PublicKey, Error> {
 ///
 /// # Errors
 ///
-/// Returns an error if the data length doesn't match the expected signature length (97 bytes).
+/// Returns an error if the data length doesn't match the expected signature
+/// length (97 bytes).
 ///
 /// # Examples
 ///
@@ -106,7 +110,6 @@ pub fn pubkey_from_bytes(data: &[u8]) -> Result<PublicKey, Error> {
 ///
 /// let bytes = [1u8; 97];
 /// let signature = signature_from_bytes(&bytes).unwrap();
-///
 /// ```
 pub fn signature_from_bytes(data: &[u8]) -> Result<Signature, Error> {
     if data.len() != SIGNATURE_LENGTH {
@@ -284,7 +287,10 @@ mod tests {
         assert!(result.is_err());
         assert!(matches!(
             result.unwrap_err(),
-            Error::InvalidSecretKeyLength { expected: 32, got: 16 }
+            Error::InvalidSecretKeyLength {
+                expected: 32,
+                got: 16
+            }
         ));
     }
 
@@ -303,7 +309,10 @@ mod tests {
         assert!(result.is_err());
         assert!(matches!(
             result.unwrap_err(),
-            Error::InvalidPublicKeyLength { expected: 48, got: 32 }
+            Error::InvalidPublicKeyLength {
+                expected: 48,
+                got: 32
+            }
         ));
     }
 
@@ -322,7 +331,10 @@ mod tests {
         assert!(result.is_err());
         assert!(matches!(
             result.unwrap_err(),
-            Error::InvalidSignatureLength { expected: 97, got: 96 }
+            Error::InvalidSignatureLength {
+                expected: 97,
+                got: 96
+            }
         ));
     }
 
@@ -377,7 +389,7 @@ mod tests {
     #[test]
     fn test_empty_slice_fails() {
         let empty: &[u8] = &[];
-        
+
         assert!(privkey_from_bytes(empty).is_err());
         assert!(pubkey_from_bytes(empty).is_err());
         assert!(signature_from_bytes(empty).is_err());
@@ -386,10 +398,9 @@ mod tests {
     #[test]
     fn test_oversized_slice_fails() {
         let data = vec![0u8; 1000];
-        
+
         assert!(privkey_from_bytes(&data).is_err());
         assert!(pubkey_from_bytes(&data).is_err());
         assert!(signature_from_bytes(&data).is_err());
     }
 }
-
