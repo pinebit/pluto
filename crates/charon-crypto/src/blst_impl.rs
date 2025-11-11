@@ -12,6 +12,9 @@ use blst::{
 };
 use rand_core::{CryptoRng, RngCore};
 
+use crypto_primitives::{crypto_bigint_const_monty::F256, crypto_bigint_uint::Uint};
+use num_traits::identities::One;
+
 use crate::{
     tbls::Tbls,
     types::{BlsError, Error, Index, MathError, PrivateKey, PublicKey, Signature},
@@ -19,6 +22,26 @@ use crate::{
 
 /// Domain Separation Tag for Ethereum 2.0 BLS signatures
 const ETH2_DST: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_";
+
+// NOTE(alex): Here we're using crypto-bigint backend, but ark-ff is also
+// supported
+crypto_bigint::const_monty_params!(
+    Bls12_381r,
+    crypto_bigint::U256,
+    "73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001"
+);
+
+type F = F256<Bls12_381r>;
+
+fn to_f(value: &blst::blst_scalar) -> F {
+    let int = Uint::new(crypto_bigint::Uint::from_le_slice(&value.b));
+    F::from(int)
+}
+
+fn from_f(value: &F) -> blst::blst_scalar {
+    let b = value.inner().retrieve().to_le_bytes();
+    blst::blst_scalar { b }
+}
 
 /// BLST implementation of threshold BLS signatures.
 ///
@@ -70,6 +93,7 @@ impl Tbls for BlstImpl {
         }
 
         let sk = BlstSecretKey::from_bytes(secret_key)?;
+        let sk = to_f((&sk).into());
 
         // Create polynomial coefficients: a_0 = secret, a_1..a_{t-1} = random
         let mut poly = Vec::with_capacity(threshold as usize);
@@ -80,13 +104,15 @@ impl Tbls for BlstImpl {
             rng.fill_bytes(&mut ikm);
             let coeff = BlstSecretKey::key_gen(&ikm, &[])
                 .map_err(|_| Error::InvalidSecretKey(BlsError::KeyGeneration))?;
-            poly.push(coeff);
+            poly.push(to_f((&coeff).into()));
         }
 
         // Evaluate polynomial at points 1..total to create shares
         let mut shares = HashMap::new();
         for i in 1..=total {
             let share = evaluate_polynomial(&poly, i)?;
+            let share = from_f(&share);
+            let share: &BlstSecretKey = (&share).try_into()?;
             shares.insert(
                 i.checked_sub(1).ok_or(MathError::IntegerUnderflow)?,
                 share.to_bytes(),
@@ -122,15 +148,18 @@ impl Tbls for BlstImpl {
             .map(|&k| k.checked_add(1).ok_or(MathError::IntegerOverflow))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let share_secrets: Vec<BlstSecretKey> = shares
+        let share_secrets: Vec<F> = shares
             .values()
             .map(|bytes| {
                 BlstSecretKey::from_bytes(bytes).map_err(|e| Error::InvalidSecretKey(e.into()))
             })
+            .map(|sk_res| sk_res.map(|sk| to_f((&sk).into())))
             .collect::<Result<Vec<_>, _>>()?;
 
         // Lagrange interpolation at x=0
         let recovered = lagrange_interpolate_secret(&share_points, &share_secrets)?;
+        let recovered = from_f(&recovered);
+        let recovered: &BlstSecretKey = (&recovered).try_into()?;
         Ok(recovered.to_bytes())
     }
 
@@ -277,29 +306,28 @@ fn aggregate_public_keys(pks: &[BlstPublicKey]) -> Result<BlstPublicKey, Error> 
 
 /// Evaluate polynomial at point x
 /// poly(x) = a_0 + a_1*x + a_2*x^2 + ... + a_n*x^n
-fn evaluate_polynomial(poly: &[BlstSecretKey], x: Index) -> Result<BlstSecretKey, Error> {
+#[allow(clippy::arithmetic_side_effects)] // Field arithmetic cannot overflow
+fn evaluate_polynomial(poly: &[F], x: Index) -> Result<F, Error> {
     if poly.is_empty() {
         return Err(Error::InvalidThreshold {
             threshold: 0,
             total: 0,
         });
     }
+    let x = F::from(x);
 
     // Start with the constant term
-    let mut result = poly[0].clone();
+    let mut result = poly[0];
 
     // Compute powers of x and accumulate
-    let mut x_power = scalar_from_u64(u64::from(x));
+    let mut x_power = x;
 
     for coeff in poly.iter().skip(1) {
-        // result += coeff * x_power
-        let term = scalar_mult_secret(coeff, &x_power)?;
-        result = scalar_add_secret(&result, &term)?;
+        result += coeff * x_power;
 
         // x_power *= x for next iteration
         if poly.len() > 2 {
-            let x_scalar = scalar_from_u64(u64::from(x));
-            x_power = scalar_mult_scalars(&x_power, &x_scalar)?;
+            x_power *= x;
         }
     }
 
@@ -308,10 +336,8 @@ fn evaluate_polynomial(poly: &[BlstSecretKey], x: Index) -> Result<BlstSecretKey
 
 /// Lagrange interpolation of secret keys at x=0
 /// Recovers f(0) from points (x_i, y_i) where y_i are secret keys
-fn lagrange_interpolate_secret(
-    indices: &[Index],
-    shares: &[BlstSecretKey],
-) -> Result<BlstSecretKey, Error> {
+#[allow(clippy::arithmetic_side_effects)] // Field arithmetic cannot overflow
+fn lagrange_interpolate_secret(indices: &[Index], shares: &[F]) -> Result<F, Error> {
     if indices.len() != shares.len() || indices.is_empty() {
         return Err(Error::InvalidThreshold {
             threshold: 0,
@@ -322,12 +348,11 @@ fn lagrange_interpolate_secret(
     // Compute Lagrange coefficients and interpolate
     let coeffs = compute_lagrange_coefficients(indices)?;
 
-    let mut result = scalar_mult_secret(&shares[0], &coeffs[0])?;
-
-    for i in 1..shares.len() {
-        let term = scalar_mult_secret(&shares[i], &coeffs[i])?;
-        result = scalar_add_secret(&result, &term)?;
-    }
+    let result = shares
+        .iter()
+        .zip(coeffs.iter())
+        .map(|(share, coeff)| share * coeff)
+        .sum();
 
     Ok(result)
 }
@@ -344,6 +369,7 @@ fn lagrange_interpolate_signature(
 
     // Compute Lagrange coefficients
     let coeffs = compute_lagrange_coefficients(indices)?;
+    let coeffs = coeffs.iter().map(from_f).collect::<Vec<_>>();
 
     // Multiply each signature by its Lagrange coefficient and aggregate
     let first_sig_scaled = signature_mult(&signatures[0], &coeffs[0])?;
@@ -373,72 +399,36 @@ fn lagrange_interpolate_signature(
 
 /// Compute Lagrange coefficients for interpolation at x=0
 /// λ_i = ∏_{j≠i} (0 - x_j) / (x_i - x_j) = ∏_{j≠i} x_j / (x_j - x_i)
-fn compute_lagrange_coefficients(indices: &[Index]) -> Result<Vec<blst::blst_scalar>, Error> {
+#[allow(clippy::arithmetic_side_effects)] // Field arithmetic cannot overflow
+fn compute_lagrange_coefficients(indices: &[Index]) -> Result<Vec<F>, Error> {
     let mut coeffs = Vec::with_capacity(indices.len());
 
     for (i, &x_i) in indices.iter().enumerate() {
-        let mut numerator = scalar_from_u64(1);
-        let mut denominator = scalar_from_u64(1);
+        let mut numerator = F::one();
+        let mut denominator = F::one();
 
         for (j, &x_j) in indices.iter().enumerate() {
             if i == j {
                 continue;
             }
 
-            // numerator *= x_j
-            let x_j_scalar = scalar_from_u64(u64::from(x_j));
-            numerator = scalar_mult_scalars(&numerator, &x_j_scalar)?;
+            numerator *= F::from(x_j);
 
             // denominator *= (x_j - x_i)
-            let diff = if x_j > x_i {
-                let diff_val = x_j.checked_sub(x_i).ok_or(MathError::IntegerUnderflow)?;
-                scalar_from_u64(u64::from(diff_val))
-            } else {
-                // For negative differences, we need to work in the scalar field
-                // x_j - x_i (mod r) where r is the curve order
-                let diff_val = x_i.checked_sub(x_j).ok_or(MathError::IntegerUnderflow)?;
-                scalar_negate(&scalar_from_u64(u64::from(diff_val)))?
+            let mut diff = F::from(x_i.abs_diff(x_j));
+            if x_j < x_i {
+                diff = -diff;
             };
 
-            denominator = scalar_mult_scalars(&denominator, &diff)?;
+            denominator *= diff;
         }
 
         // Compute numerator / denominator = numerator * denominator^{-1}
-        let coeff = scalar_div(&numerator, &denominator)?;
+        let coeff = numerator / denominator;
         coeffs.push(coeff);
     }
 
     Ok(coeffs)
-}
-
-/// Convert u64 to blst scalar
-fn scalar_from_u64(val: u64) -> blst::blst_scalar {
-    let mut bytes = [0u8; 32];
-    bytes[24..32].copy_from_slice(&val.to_be_bytes());
-
-    let mut scalar = blst::blst_scalar::default();
-    unsafe {
-        blst::blst_scalar_from_be_bytes(&mut scalar, bytes.as_ptr(), bytes.len());
-    }
-    scalar
-}
-
-/// Multiply secret key by scalar
-fn scalar_mult_secret(
-    sk: &BlstSecretKey,
-    scalar: &blst::blst_scalar,
-) -> Result<BlstSecretKey, Error> {
-    let sk_scalar = secret_to_scalar(sk);
-    let result_scalar = scalar_mult_scalars(&sk_scalar, scalar)?;
-    scalar_to_secret(&result_scalar)
-}
-
-/// Add two secret keys
-fn scalar_add_secret(sk1: &BlstSecretKey, sk2: &BlstSecretKey) -> Result<BlstSecretKey, Error> {
-    let s1 = secret_to_scalar(sk1);
-    let s2 = secret_to_scalar(sk2);
-    let result = scalar_add(&s1, &s2)?;
-    scalar_to_secret(&result)
 }
 
 /// Multiply signature by scalar
@@ -460,102 +450,6 @@ fn signature_mult(sig: &BlstSignature, scalar: &blst::blst_scalar) -> Result<Bls
     }
 
     Ok(BlstSignature::from(result_affine))
-}
-
-/// Convert secret key to scalar
-fn secret_to_scalar(sk: &BlstSecretKey) -> blst::blst_scalar {
-    let bytes = sk.to_bytes();
-    let mut scalar = blst::blst_scalar::default();
-    unsafe {
-        blst::blst_scalar_from_be_bytes(&mut scalar, bytes.as_ptr(), bytes.len());
-    }
-    scalar
-}
-
-/// Convert scalar to secret key
-fn scalar_to_secret(scalar: &blst::blst_scalar) -> Result<BlstSecretKey, Error> {
-    let mut bytes = [0u8; 32];
-    unsafe {
-        blst::blst_bendian_from_scalar(bytes.as_mut_ptr(), scalar);
-    }
-
-    BlstSecretKey::from_bytes(&bytes).map_err(|e| Error::InvalidSecretKey(e.into()))
-}
-
-/// Add two scalars
-fn scalar_add(a: &blst::blst_scalar, b: &blst::blst_scalar) -> Result<blst::blst_scalar, Error> {
-    let mut result = blst::blst_scalar::default();
-    unsafe {
-        blst::blst_sk_add_n_check(&mut result, a, b);
-    }
-    Ok(result)
-}
-
-/// Multiply two scalars
-fn scalar_mult_scalars(
-    a: &blst::blst_scalar,
-    b: &blst::blst_scalar,
-) -> Result<blst::blst_scalar, Error> {
-    let mut result = blst::blst_scalar::default();
-    unsafe {
-        blst::blst_sk_mul_n_check(&mut result, a, b);
-    }
-    Ok(result)
-}
-
-/// Negate a scalar
-fn scalar_negate(a: &blst::blst_scalar) -> Result<blst::blst_scalar, Error> {
-    // To negate in the field, we compute (r - a) where r is the curve order
-    // But blst doesn't expose this directly, so we use: -a ≡ r - a
-    // We can compute this as: 0 - a
-    let zero = scalar_from_u64(0);
-    let mut result_scalar = blst::blst_scalar::default();
-
-    unsafe {
-        // Convert scalars to fr for arithmetic
-        let mut a_fr = blst::blst_fr::default();
-        let mut zero_fr = blst::blst_fr::default();
-
-        // blst_scalar.b is [u8; 32], blst_fr.l is [u64; 4]
-        // We need to convert through bytes
-        let mut a_bytes = [0u8; 32];
-        let mut zero_bytes = [0u8; 32];
-        blst::blst_bendian_from_scalar(a_bytes.as_mut_ptr(), a);
-        blst::blst_bendian_from_scalar(zero_bytes.as_mut_ptr(), &zero);
-
-        blst::blst_fr_from_scalar(&mut a_fr, a);
-        blst::blst_fr_from_scalar(&mut zero_fr, &zero);
-
-        let mut result_fr = blst::blst_fr::default();
-        blst::blst_fr_sub(&mut result_fr, &zero_fr, &a_fr);
-
-        blst::blst_scalar_from_fr(&mut result_scalar, &result_fr);
-    }
-
-    Ok(result_scalar)
-}
-
-/// Divide two scalars (multiply by inverse)
-fn scalar_div(
-    numerator: &blst::blst_scalar,
-    denominator: &blst::blst_scalar,
-) -> Result<blst::blst_scalar, Error> {
-    let mut inv_scalar = blst::blst_scalar::default();
-
-    unsafe {
-        // Convert denominator to fr
-        let mut denom_fr = blst::blst_fr::default();
-        blst::blst_fr_from_scalar(&mut denom_fr, denominator);
-
-        // Compute multiplicative inverse
-        let mut inv_fr = blst::blst_fr::default();
-        blst::blst_fr_eucl_inverse(&mut inv_fr, &denom_fr);
-
-        // Convert back to scalar
-        blst::blst_scalar_from_fr(&mut inv_scalar, &inv_fr);
-    }
-
-    scalar_mult_scalars(numerator, &inv_scalar)
 }
 
 /// Convert signature to bytes

@@ -35,6 +35,9 @@ blst = "0.3.13"
 rand_core = "0.6"
 thiserror = "2.0.12"
 rand = {version = "0.8", features = ["std_rng"]}
+crypto-primitives = { git = "https://github.com/NethermindEth/crypto-primitives.git", rev = "0636ec2e5b23208e202a83de0c83b2b633e6629f", features = ["std", "crypto_bigint"] }
+crypto-bigint = { version = "0.7.0-rc.10"}
+num-traits = "0.2.19"
 
 [workspace.lints.rust]
 missing_docs = "deny"

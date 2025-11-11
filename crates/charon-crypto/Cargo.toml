@@ -9,10 +9,13 @@ publish.workspace = true
 [dependencies]
 rand.workspace = true
 blst.workspace = true
+crypto-primitives.workspace = true
+crypto-bigint.workspace = true
 rand_core.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 hex.workspace = true
+num-traits.workspace = true
 
 [lints.rust]
 # Allow unsafe code for blst C bindings (overrides workspace forbid)
