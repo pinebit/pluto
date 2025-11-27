@@ -16,7 +16,7 @@ hex.workspace = true
 
 [lints.rust]
 # Allow unsafe code for blst C bindings (overrides workspace forbid)
-unsafe_code = "deny"
+unsafe_code = "allow"
 missing_docs = "deny"
 
 [lints.clippy]
