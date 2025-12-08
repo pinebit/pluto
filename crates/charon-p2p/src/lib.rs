@@ -10,3 +10,6 @@ pub mod peer;
 
 /// Name-related types and utilities.
 pub mod name;
+
+/// P2P configuration.
+pub mod config;
