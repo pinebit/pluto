@@ -35,23 +35,23 @@ async fn main() {
             .expect("Failed to start metrics exporter");
     });
 
-    P2P_METRICS.ping_latency_secs["rustnew"].observe(1.0);
-    P2P_METRICS.ping_error_total["rustnew"].inc();
-    P2P_METRICS.ping_success["rustnew"].set(1);
+    P2P_METRICS.ping_latency_secs["rust"].observe(1.0);
+    P2P_METRICS.ping_error_total["rust"].inc();
+    P2P_METRICS.ping_success["rust"].set(1);
     P2P_METRICS.reachability_status.set(1);
-    P2P_METRICS.relay_connections["rustnew"].set(1);
+    P2P_METRICS.relay_connections["rust"].set(1);
     P2P_METRICS.peer_connection_types
-        [&PeerConnectionLabels::new("rustnew", ConnectionType::Direct, Protocol::Tcp)]
+        [&PeerConnectionLabels::new("rust", ConnectionType::Direct, Protocol::Tcp)]
         .set(1);
     P2P_METRICS.relay_connection_types
-        [&RelayConnectionLabels::new("rustnew", ConnectionType::Direct, Protocol::Tcp)]
+        [&RelayConnectionLabels::new("rust", ConnectionType::Direct, Protocol::Tcp)]
         .set(1);
-    P2P_METRICS.peer_streams[&PeerStreamLabels::new("rustnew", Direction::Inbound, Protocol::Tcp)]
+    P2P_METRICS.peer_streams[&PeerStreamLabels::new("rust", Direction::Inbound, Protocol::Tcp)]
         .set(1);
-    P2P_METRICS.peer_connection_total["rustnew"].inc();
-    P2P_METRICS.peer_network_receive_bytes_total[&PeerNetworkLabels::new("rustnew", Protocol::Tcp)]
+    P2P_METRICS.peer_connection_total["rust"].inc();
+    P2P_METRICS.peer_network_receive_bytes_total[&PeerNetworkLabels::new("rust", Protocol::Tcp)]
         .inc();
-    P2P_METRICS.peer_network_sent_bytes_total[&PeerNetworkLabels::new("rustnew", Protocol::Tcp)]
+    P2P_METRICS.peer_network_sent_bytes_total[&PeerNetworkLabels::new("rust", Protocol::Tcp)]
         .inc();
 
     // Wait for 10 seconds to see the logs in Loki
