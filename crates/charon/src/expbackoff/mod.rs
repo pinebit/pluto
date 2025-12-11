@@ -255,6 +255,27 @@ mod tests {
         });
     }
 
+    #[test]
+    fn fast() {
+        assert_test_case(TestCase {
+            config: ExponentialBackoffBuilder::<HasherRng>::fast_config(),
+            rng: 0.5,
+            backoffs: vec![
+                Duration::from_millis(100),
+                Duration::from_millis(160),
+                Duration::from_millis(250),
+                Duration::from_millis(400),
+                Duration::from_millis(650),
+                Duration::from_secs(1) + Duration::from_millis(40),
+                Duration::from_secs(1) + Duration::from_millis(670),
+                Duration::from_secs(2) + Duration::from_millis(680),
+                Duration::from_secs(4) + Duration::from_millis(290),
+                Duration::from_secs(5),
+                Duration::from_secs(5),
+            ],
+        });
+    }
+
     fn assert_test_case(tc: TestCase) {
         let mut instance = tc.config.with_rng(Const(tc.rng)).build().unwrap();
 
