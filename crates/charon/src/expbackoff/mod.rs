@@ -97,7 +97,7 @@ impl Default for ExponentialBackoffBuilder {
     /// This should be useful for callers who want to configure backoff with
     /// non-default values only for a subset of the options.
     ///
-    /// Copied from [google.golang.org/grpc@v1.48.0/backoff/backoff.go]
+    /// Copied from [`google.golang.org/grpc@v1.48.0/backoff/backoff.go`](https://github.com/grpc/grpc-go/blob/v1.48.0/backoff/backoff.go)
     fn default() -> Self {
         Self {
             base_delay: time::Duration::from_secs(1),
@@ -136,7 +136,8 @@ impl<R> ExponentialBackoffBuilder<R> {
         self
     }
 
-    /// Set the factor with which backoffs are randomized.
+    /// Set the factor with which backoffs are randomized. The factor must be in
+    /// the range [0, 1].
     pub fn with_jitter(mut self, jitter: f64) -> Self {
         self.jitter = jitter;
         self
@@ -164,14 +165,17 @@ impl<R> ExponentialBackoffBuilder<R> {
         if self.base_delay > self.max_delay {
             return Err(InvalidBackoff("maximum must not be less than base"));
         }
+        if self.base_delay == time::Duration::from_millis(0) {
+            return Err(InvalidBackoff("base must be non-zero"));
+        }
         if self.max_delay == time::Duration::from_millis(0) {
             return Err(InvalidBackoff("maximum must be non-zero"));
         }
         if self.jitter < 0.0 {
             return Err(InvalidBackoff("jitter must not be negative"));
         }
-        if self.jitter > 100.0 {
-            return Err(InvalidBackoff("jitter must not be greater than 100"));
+        if self.jitter > 1.0 {
+            return Err(InvalidBackoff("jitter must not be greater than 1"));
         }
         if self.jitter.is_infinite() || self.jitter.is_nan() {
             return Err(InvalidBackoff("jitter must be finite"));
