@@ -34,7 +34,7 @@ where
         let mut backoff = self.base_delay;
         let mut retries = self.retries;
 
-        // SAFE: Substraction is only performed when retries > 0
+        // SAFE: Subtraction is only performed when retries > 0
         #[allow(clippy::arithmetic_side_effects)]
         while backoff < self.max_delay && retries > 0 {
             backoff = backoff.mul_f64(self.multiplier);
@@ -173,11 +173,14 @@ impl<R> ExponentialBackoffBuilder<R> {
         if self.jitter > 100.0 {
             return Err(InvalidBackoff("jitter must not be greater than 100"));
         }
-        if !self.jitter.is_finite() {
+        if self.jitter.is_infinite() || self.jitter.is_nan() {
             return Err(InvalidBackoff("jitter must be finite"));
         }
         if self.multiplier < 0.0 {
             return Err(InvalidBackoff("multiplier must not be negative"));
+        }
+        if self.multiplier.is_infinite() || self.multiplier.is_nan() {
+            return Err(InvalidBackoff("multiplier must be finite"));
         }
 
         Ok(ExponentialBackoff {
@@ -323,7 +326,7 @@ mod tests {
         instance.tried();
         assert_eq!(total_time, Duration::from_secs(7));
 
-        // third backoff
+        // fourth backoff
         total_time += instance.backoff();
         instance.tried();
         assert_eq!(total_time, Duration::from_secs(15));
@@ -331,7 +334,7 @@ mod tests {
         // reset
         instance.reset();
 
-        // fourth backoff
+        // fifth backoff
         total_time += instance.backoff();
         instance.tried();
         assert_eq!(total_time, Duration::from_secs(16));
