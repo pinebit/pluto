@@ -73,15 +73,6 @@ where
     }
 }
 
-/// Builder pattern to create an [`ExponentialBackoff`] instance.
-pub struct ExponentialBackoffBuilder<R> {
-    base_delay: time::Duration,
-    multiplier: f64,
-    jitter: f64,
-    max_delay: time::Duration,
-    rng: R,
-}
-
 type Result<T> = std::result::Result<T, InvalidBackoff>;
 
 /// Error indicating an invalid backoff configuration.
@@ -89,15 +80,24 @@ type Result<T> = std::result::Result<T, InvalidBackoff>;
 #[error("Invalid backoff configuration: {0}")]
 pub struct InvalidBackoff(&'static str);
 
-impl<R> ExponentialBackoffBuilder<R> {
+/// Builder pattern to create an [`ExponentialBackoff`] instance.
+pub struct ExponentialBackoffBuilder<R = HasherRng> {
+    base_delay: time::Duration,
+    multiplier: f64,
+    jitter: f64,
+    max_delay: time::Duration,
+    rng: R,
+}
+
+impl ExponentialBackoffBuilder {
     /// Backoff configuration with the default values specified at https://github.com/grpc/grpc/blob/master/doc/connection-backoff.md.
     ///
     /// This should be useful for callers who want to configure backoff with
     /// non-default values only for a subset of the options.
     ///
     /// Copied from [google.golang.org/grpc@v1.48.0/backoff/backoff.go]
-    pub fn default() -> ExponentialBackoffBuilder<HasherRng> {
-        ExponentialBackoffBuilder {
+    pub fn default() -> Self {
+        Self {
             base_delay: time::Duration::from_secs(1),
             multiplier: 1.6,
             jitter: 0.2,
@@ -107,8 +107,8 @@ impl<R> ExponentialBackoffBuilder<R> {
     }
 
     /// Common configuration for fast backoff.
-    pub fn fast_config() -> ExponentialBackoffBuilder<HasherRng> {
-        ExponentialBackoffBuilder {
+    pub fn fast_config() -> Self {
+        Self {
             base_delay: time::Duration::from_millis(100),
             multiplier: 1.6,
             jitter: 0.2,
@@ -116,7 +116,9 @@ impl<R> ExponentialBackoffBuilder<R> {
             rng: HasherRng::default(),
         }
     }
+}
 
+impl<R> ExponentialBackoffBuilder<R> {
     /// Set the amount of time to backoff after the first failure.
     pub fn with_base_delay(mut self, delay: time::Duration) -> Self {
         self.base_delay = delay;
@@ -189,7 +191,7 @@ impl<R> ExponentialBackoffBuilder<R> {
 mod tests {
     use crate::expbackoff::ExponentialBackoffBuilder;
     use core::time::Duration;
-    use tower::util::rng::{HasherRng, Rng};
+    use tower::util::rng::Rng;
 
     struct Const(f64);
 
@@ -204,7 +206,7 @@ mod tests {
     }
 
     struct TestCase {
-        config: ExponentialBackoffBuilder<HasherRng>,
+        config: ExponentialBackoffBuilder,
         rng: f64,
         backoffs: Vec<Duration>,
     }
@@ -212,7 +214,7 @@ mod tests {
     #[test]
     fn default_config() {
         assert_test_case(TestCase {
-            config: ExponentialBackoffBuilder::<HasherRng>::default(),
+            config: ExponentialBackoffBuilder::default(),
             rng: 0.5,
             backoffs: vec![
                 Duration::from_secs(1),
@@ -235,7 +237,7 @@ mod tests {
     #[test]
     fn default_config_max_jitter() {
         assert_test_case(TestCase {
-            config: ExponentialBackoffBuilder::<HasherRng>::default(),
+            config: ExponentialBackoffBuilder::default(),
             rng: 1.0,
             backoffs: vec![
                 Duration::from_secs(1),
@@ -258,7 +260,7 @@ mod tests {
     #[test]
     fn fast() {
         assert_test_case(TestCase {
-            config: ExponentialBackoffBuilder::<HasherRng>::fast_config(),
+            config: ExponentialBackoffBuilder::fast_config(),
             rng: 0.5,
             backoffs: vec![
                 Duration::from_millis(100),
