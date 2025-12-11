@@ -187,9 +187,9 @@ impl<R> ExponentialBackoffBuilder<R> {
 
 #[cfg(test)]
 mod tests {
-    use crate::expbackoff::{ExponentialBackoff, ExponentialBackoffBuilder};
+    use crate::expbackoff::ExponentialBackoffBuilder;
     use core::time::Duration;
-    use tower::util::rng::Rng;
+    use tower::util::rng::{HasherRng, Rng};
 
     struct Const(f64);
 
@@ -203,63 +203,64 @@ mod tests {
         }
     }
 
+    struct TestCase {
+        config: ExponentialBackoffBuilder<HasherRng>,
+        rng: f64,
+        backoffs: Vec<Duration>,
+    }
+
     #[test]
     fn default_config() {
-        let backoffs: Vec<Duration> = vec![
-            Duration::from_secs(1),
-            Duration::from_secs(1) + Duration::from_millis(600),
-            Duration::from_secs(2) + Duration::from_millis(560),
-            Duration::from_secs(4) + Duration::from_millis(090),
-            Duration::from_secs(6) + Duration::from_millis(550),
-            Duration::from_secs(10) + Duration::from_millis(480),
-            Duration::from_secs(16) + Duration::from_millis(770),
-            Duration::from_secs(26) + Duration::from_millis(840),
-            Duration::from_secs(42) + Duration::from_millis(940),
-            Duration::from_mins(1) + Duration::from_millis(8710),
-            Duration::from_mins(1) + Duration::from_millis(49950),
-            Duration::from_mins(2),
-            Duration::from_mins(2),
-        ];
-
-        let mut backoff = ExponentialBackoffBuilder::<Const>::default()
-            .with_rng(Const(0.5))
-            .build()
-            .unwrap();
-
-        for expected in backoffs {
-            let duration = backoff.backoff();
-            backoff.tried();
-
-            assert!(duration - expected <= Duration::from_millis(10));
-        }
+        assert_test_case(TestCase {
+            config: ExponentialBackoffBuilder::<HasherRng>::default(),
+            rng: 0.5,
+            backoffs: vec![
+                Duration::from_secs(1),
+                Duration::from_secs(1) + Duration::from_millis(600),
+                Duration::from_secs(2) + Duration::from_millis(560),
+                Duration::from_secs(4) + Duration::from_millis(090),
+                Duration::from_secs(6) + Duration::from_millis(550),
+                Duration::from_secs(10) + Duration::from_millis(480),
+                Duration::from_secs(16) + Duration::from_millis(770),
+                Duration::from_secs(26) + Duration::from_millis(840),
+                Duration::from_secs(42) + Duration::from_millis(940),
+                Duration::from_mins(1) + Duration::from_millis(8710),
+                Duration::from_mins(1) + Duration::from_millis(49950),
+                Duration::from_mins(2),
+                Duration::from_mins(2),
+            ],
+        });
     }
 
     #[test]
     fn default_config_max_jitter() {
-        let backoffs: Vec<Duration> = vec![
-            Duration::from_secs(1),
-            Duration::from_secs(1) + Duration::from_millis(920),
-            Duration::from_secs(3) + Duration::from_millis(70),
-            Duration::from_secs(4) + Duration::from_millis(910),
-            Duration::from_secs(7) + Duration::from_millis(860),
-            Duration::from_secs(12) + Duration::from_millis(580),
-            Duration::from_secs(20) + Duration::from_millis(130),
-            Duration::from_secs(32) + Duration::from_millis(210),
-            Duration::from_secs(51) + Duration::from_millis(530),
-            Duration::from_mins(1) + Duration::from_secs(22) + Duration::from_millis(460),
-            Duration::from_mins(2) + Duration::from_secs(11) + Duration::from_millis(940),
-            Duration::from_mins(2) + Duration::from_secs(24),
-            Duration::from_mins(2) + Duration::from_secs(24),
-        ];
+        assert_test_case(TestCase {
+            config: ExponentialBackoffBuilder::<HasherRng>::default(),
+            rng: 1.0,
+            backoffs: vec![
+                Duration::from_secs(1),
+                Duration::from_secs(1) + Duration::from_millis(920),
+                Duration::from_secs(3) + Duration::from_millis(70),
+                Duration::from_secs(4) + Duration::from_millis(910),
+                Duration::from_secs(7) + Duration::from_millis(860),
+                Duration::from_secs(12) + Duration::from_millis(580),
+                Duration::from_secs(20) + Duration::from_millis(130),
+                Duration::from_secs(32) + Duration::from_millis(210),
+                Duration::from_secs(51) + Duration::from_millis(530),
+                Duration::from_mins(1) + Duration::from_secs(22) + Duration::from_millis(460),
+                Duration::from_mins(2) + Duration::from_secs(11) + Duration::from_millis(940),
+                Duration::from_mins(2) + Duration::from_secs(24),
+                Duration::from_mins(2) + Duration::from_secs(24),
+            ],
+        });
+    }
 
-        let mut backoff: ExponentialBackoff<Const> = ExponentialBackoffBuilder::<Const>::default()
-            .with_rng(Const(1.0))
-            .build()
-            .unwrap();
+    fn assert_test_case(tc: TestCase) {
+        let mut instance = tc.config.with_rng(Const(tc.rng)).build().unwrap();
 
-        for expected in backoffs {
-            let duration = backoff.backoff();
-            backoff.tried();
+        for expected in tc.backoffs {
+            let duration = instance.backoff();
+            instance.tried();
 
             assert!(duration - expected <= Duration::from_millis(10));
         }
