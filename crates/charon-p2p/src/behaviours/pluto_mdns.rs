@@ -18,7 +18,7 @@ impl PlutoMdnsBehaviour {
         Self {
             pluto: PlutoBehaviour::new(key, relay_client),
             mdns: mdns::tokio::Behaviour::new(mdns::Config::default(), key.public().to_peer_id())
-                .unwrap(),
+                .expect("Failed to create mDNS behaviour"),
         }
     }
 }

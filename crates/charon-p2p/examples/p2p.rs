@@ -7,8 +7,10 @@
 use anyhow::Result;
 use charon_eth2::enr::Record;
 use charon_p2p::{
-    behaviours::pluto::{PlutoBehaviourEvent},
-    behaviours::pluto_mdns::{PlutoMdnsBehaviour, PlutoMdnsBehaviourEvent},
+    behaviours::{
+        pluto::PlutoBehaviourEvent,
+        pluto_mdns::{PlutoMdnsBehaviour, PlutoMdnsBehaviourEvent},
+    },
     config::P2PConfig,
     gater::ConnGater,
     p2p::{Node, NodeType},
