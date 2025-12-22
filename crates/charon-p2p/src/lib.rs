@@ -25,3 +25,6 @@ pub mod gater;
 
 /// Behaviours.
 pub mod behaviours;
+
+/// K1 utilities.
+pub mod k1;
