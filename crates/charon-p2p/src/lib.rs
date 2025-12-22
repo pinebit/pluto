@@ -22,3 +22,6 @@ pub mod p2p;
 
 /// Gater
 pub mod gater;
+
+/// Behaviours.
+pub mod behaviours;

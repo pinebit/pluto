@@ -18,49 +18,34 @@ use libp2p::mdns;
 
 use crate::{config::P2PConfig, gater::ConnGater};
 
+#[derive(Debug, thiserror::Error)]
+pub enum P2PError {
+    /// Failed to build the swarm.
+    #[error("Failed to build the swarm: {0}")]
+    FailedToBuildSwarm(Box<dyn std::error::Error + Send + Sync>),
+
+    #[error("Failed to convert the secret key to a libp2p keypair: {0}")]
+    FailedToConvertSecretKeyToLibp2pKeypair(#[from] k256::pkcs8::der::Error),
+
+    #[error("Failed to decode the libp2p keypair: {0}")]
+    FailedToDecodeLibp2pKeypair(#[from] libp2p::identity::DecodingError),
+}
+
+impl P2PError {
+    pub fn failed_to_build_swarm(error: impl std::error::Error + Send + Sync + 'static) -> Self {
+        Self::FailedToBuildSwarm(Box::new(error))
+    }
+}
+
+type Result<T> = std::result::Result<T, P2PError>;
+
 pub enum NodeType {
     TCP,
     QUIC,
 }
 
-#[derive(NetworkBehaviour)]
-pub struct PlutoBehavior {
-    pub relay: relay::Behaviour,
-    pub identify: identify::Behaviour,
-    pub ping: ping::Behaviour,
-    pub mdns: mdns::tokio::Behaviour,
-}
-
-pub trait LoopBehavior {
-    fn spawn_loop(&self) -> impl Future<Output = ()>;
-}
-
-impl LoopBehavior for Node<PlutoBehavior> {
-    async fn spawn_loop(&self) {}
-}
-
-impl PlutoBehavior {
-    pub fn new(key: &Keypair) -> Self {
-        Self {
-            relay: relay::Behaviour::new(key.public().to_peer_id(), Default::default()),
-            identify: identify::Behaviour::new(identify::Config::new(
-                "/pluto/1.0.0-alpha".into(),
-                key.public(),
-            )),
-            ping: ping::Behaviour::new(
-                ping::Config::new()
-                    .with_interval(Duration::from_secs(1))
-                    .with_timeout(Duration::from_secs(2)),
-            ),
-            mdns: mdns::tokio::Behaviour::new(mdns::Config::default(), key.public().to_peer_id())
-                .unwrap(),
-        }
-    }
-}
-
 pub struct Node<B: NetworkBehaviour> {
     pub swarm: Swarm<B>,
-    pub callbacks: Vec<Box<dyn Fn(&SwarmEvent<B>) + Send + Sync>>,
 }
 
 impl<B: NetworkBehaviour> Node<B> {
@@ -70,19 +55,27 @@ impl<B: NetworkBehaviour> Node<B> {
         conn_gater: ConnGater,
         filter_private_addrs: bool,
         node_type: NodeType,
-        behavior_fn: F,
-    ) -> Self
+        behaviour_fn: F,
+    ) -> Result<Self>
     where
-        F: Fn(&Keypair) -> B,
+        F: Fn(&Keypair, relay::client::Behaviour) -> B,
     {
         match node_type {
             NodeType::TCP => {
-                Self::new_with_tcp(cfg, key, conn_gater, filter_private_addrs, behavior_fn)
+                Self::new_with_tcp(cfg, key, conn_gater, filter_private_addrs, behaviour_fn)
             }
             NodeType::QUIC => {
-                Self::new_with_quic(cfg, key, conn_gater, filter_private_addrs, behavior_fn)
+                Self::new_with_quic(cfg, key, conn_gater, filter_private_addrs, behaviour_fn)
             }
         }
+    }
+
+    fn default_swarm_config(cfg: libp2p::swarm::Config) -> libp2p::swarm::Config {
+        cfg.with_idle_connection_timeout(Duration::from_secs(300))
+    }
+
+    fn default_tcp_config() -> tcp::Config {
+        tcp::Config::default()
     }
 
     pub fn new_with_quic<F>(
@@ -90,32 +83,33 @@ impl<B: NetworkBehaviour> Node<B> {
         key: k256::SecretKey,
         conn_gater: ConnGater,
         filter_private_addrs: bool,
-        behavior_fn: F,
-    ) -> Self
+        behaviour_fn: F,
+    ) -> Result<Self>
     where
-        F: Fn(&Keypair) -> B,
+        F: Fn(&Keypair, relay::client::Behaviour) -> B,
     {
-        let mut der = key.to_sec1_der().unwrap();
-        let keypair = Keypair::secp256k1_from_der(&mut der).unwrap();
+        let mut der = key.to_sec1_der()?;
+        let keypair = Keypair::secp256k1_from_der(&mut der)?;
 
         let mut swarm = SwarmBuilder::with_existing_identity(keypair.clone())
             .with_tokio()
             .with_tcp(
-                tcp::Config::default(),
+                Self::default_tcp_config(),
                 noise::Config::new,
                 yamux::Config::default,
             )
-            .unwrap()
+            .map_err(P2PError::failed_to_build_swarm)?
             .with_quic()
-            .with_behaviour(behavior_fn)
-            .unwrap()
-            .with_swarm_config(|cfg| cfg.with_idle_connection_timeout(Duration::from_secs(300)))
+            .with_dns()
+            .map_err(P2PError::failed_to_build_swarm)?
+            .with_relay_client(noise::Config::new, yamux::Config::default)
+            .map_err(P2PError::failed_to_build_swarm)?
+            .with_behaviour(behaviour_fn)
+            .map_err(P2PError::failed_to_build_swarm)?
+            .with_swarm_config(Self::default_swarm_config)
             .build();
 
-        Node {
-            swarm,
-            callbacks: vec![],
-        }
+        Ok(Node { swarm })
     }
 
     pub fn new_with_tcp<F>(
@@ -123,10 +117,10 @@ impl<B: NetworkBehaviour> Node<B> {
         key: k256::SecretKey,
         conn_gater: ConnGater,
         filter_private_addrs: bool,
-        behavior_fn: F,
-    ) -> Self
+        behaviour_fn: F,
+    ) -> Result<Self>
     where
-        F: Fn(&Keypair) -> B,
+        F: Fn(&Keypair, relay::client::Behaviour) -> B,
     {
         let mut der = key.to_sec1_der().unwrap();
         let keypair = Keypair::secp256k1_from_der(&mut der).unwrap();
@@ -134,21 +128,20 @@ impl<B: NetworkBehaviour> Node<B> {
         let mut swarm = SwarmBuilder::with_existing_identity(keypair.clone())
             .with_tokio()
             .with_tcp(
-                tcp::Config::default(),
+                Self::default_tcp_config(),
                 noise::Config::new,
                 yamux::Config::default,
             )
-            .unwrap()
-            .with_behaviour(behavior_fn)
-            .unwrap()
-            .with_swarm_config(|cfg| cfg.with_idle_connection_timeout(Duration::from_secs(300)))
+            .map_err(P2PError::failed_to_build_swarm)?
+            .with_dns()
+            .map_err(P2PError::failed_to_build_swarm)?
+            .with_relay_client(noise::Config::new, yamux::Config::default)
+            .map_err(P2PError::failed_to_build_swarm)?
+            .with_behaviour(behaviour_fn)
+            .map_err(P2PError::failed_to_build_swarm)?
+            .with_swarm_config(Self::default_swarm_config)
             .build();
 
-        Node {
-            swarm,
-            callbacks: vec![],
-        }
+        Ok(Node { swarm })
     }
-
-    pub fn add_callback(&mut self, callback: Box<dyn Fn(&SwarmEvent<B>) + Send + Sync>) {}
 }

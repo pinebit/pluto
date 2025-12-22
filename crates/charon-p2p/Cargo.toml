@@ -19,9 +19,15 @@ tokio.workspace = true
 charon-testutil.workspace = true
 vise-exporter.workspace = true
 anyhow.workspace = true
+clap.workspace = true
+charon-k1util.workspace = true
 
 [lints]
 workspace = true
 
 [features]
 mdns = ["libp2p/mdns"]
+
+[[example]]
+name = "p2p"
+required-features = ["mdns"]
