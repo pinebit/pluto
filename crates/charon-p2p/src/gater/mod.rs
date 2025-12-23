@@ -3,8 +3,9 @@
 //! This module provides connection gating functionality that limits access to
 //! cluster peers and relays. In Rust libp2p, connection gating is implemented
 //! via the `NetworkBehaviour` trait, specifically through the
-//! `handle_established_inbound_connection` and `handle_established_outbound_connection`
-//! methods which can reject connections by returning `ConnectionDenied`.
+//! `handle_established_inbound_connection` and
+//! `handle_established_outbound_connection` methods which can reject
+//! connections by returning `ConnectionDenied`.
 
 use std::{
     collections::{HashSet, VecDeque},
@@ -33,7 +34,8 @@ pub struct Config {
 }
 
 impl Config {
-    /// Creates a new open gater configuration that does not gate any connections.
+    /// Creates a new open gater configuration that does not gate any
+    /// connections.
     pub fn open() -> Self {
         Self {
             peer_ids: HashSet::new(),
@@ -75,10 +77,14 @@ pub struct ConnGater {
 impl ConnGater {
     /// Creates a new connection gater with the given configuration.
     pub fn new(config: Config) -> Self {
-        Self { config, events: VecDeque::new() }
+        Self {
+            config,
+            events: VecDeque::new(),
+        }
     }
 
-    /// Creates a new connection gater that limits access to the cluster peers and relays.
+    /// Creates a new connection gater that limits access to the cluster peers
+    /// and relays.
     pub fn new_conn_gater(peers: Vec<PeerId>, relays: Vec<Arc<MutablePeer>>) -> Self {
         Self {
             config: Config::closed().with_peer_ids(peers).with_relays(relays),
@@ -112,10 +118,8 @@ impl ConnGater {
 
         // Check if peer is a relay
         for relay in &self.config.relays {
-            if let Ok(Some(peer)) = relay.peer() {
-                if peer.id == *peer_id {
-                    return true;
-                }
+            if let Ok(Some(peer)) = relay.peer() && peer.id == *peer_id {
+                return true;
             }
         }
 
@@ -174,7 +178,10 @@ impl NetworkBehaviour for ConnGater {
         // Handler events are Void, so this is unreachable
     }
 
-    fn poll(&mut self, _cx: &mut Context<'_>) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
+    fn poll(
+        &mut self,
+        _cx: &mut Context<'_>,
+    ) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
         // Emit any blocked events
         if !self.events.is_empty() {
             let event = self.events.pop_front().expect("events is not empty");

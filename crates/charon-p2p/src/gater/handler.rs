@@ -1,8 +1,9 @@
 //! Connection handler for the gater behaviour.
 //!
-//! This is a dummy handler since the gater doesn't need to negotiate any protocols
-//! or handle any connection-level events. The actual gating logic happens at the
-//! connection establishment phase in the `NetworkBehaviour` implementation.
+//! This is a dummy handler since the gater doesn't need to negotiate any
+//! protocols or handle any connection-level events. The actual gating logic
+//! happens at the connection establishment phase in the `NetworkBehaviour`
+//! implementation.
 
 use std::{
     convert::Infallible,
@@ -10,8 +11,7 @@ use std::{
 };
 
 use libp2p::swarm::{
-    ConnectionHandler, ConnectionHandlerEvent, Stream, SubstreamProtocol,
-    handler::ConnectionEvent,
+    ConnectionHandler, ConnectionHandlerEvent, Stream, SubstreamProtocol, handler::ConnectionEvent,
 };
 
 /// Dummy connection handler for the gater.
@@ -32,11 +32,11 @@ impl Handler {
 
 impl ConnectionHandler for Handler {
     type FromBehaviour = Infallible;
-    type ToBehaviour = Infallible;
-    type InboundProtocol = DeniedUpgrade;
-    type OutboundProtocol = DeniedUpgrade;
     type InboundOpenInfo = ();
+    type InboundProtocol = DeniedUpgrade;
     type OutboundOpenInfo = Infallible;
+    type OutboundProtocol = DeniedUpgrade;
+    type ToBehaviour = Infallible;
 
     fn listen_protocol(&self) -> SubstreamProtocol<Self::InboundProtocol, Self::InboundOpenInfo> {
         SubstreamProtocol::new(DeniedUpgrade, ())
@@ -84,9 +84,9 @@ impl libp2p::core::UpgradeInfo for DeniedUpgrade {
 }
 
 impl libp2p::core::upgrade::InboundUpgrade<Stream> for DeniedUpgrade {
-    type Output = Infallible;
     type Error = Infallible;
     type Future = std::future::Pending<Result<Self::Output, Self::Error>>;
+    type Output = Infallible;
 
     fn upgrade_inbound(self, _: Stream, _: Self::Info) -> Self::Future {
         std::future::pending()
@@ -94,9 +94,9 @@ impl libp2p::core::upgrade::InboundUpgrade<Stream> for DeniedUpgrade {
 }
 
 impl libp2p::core::upgrade::OutboundUpgrade<Stream> for DeniedUpgrade {
-    type Output = Infallible;
     type Error = Infallible;
     type Future = std::future::Pending<Result<Self::Output, Self::Error>>;
+    type Output = Infallible;
 
     fn upgrade_outbound(self, _: Stream, _: Self::Info) -> Self::Future {
         std::future::pending()
