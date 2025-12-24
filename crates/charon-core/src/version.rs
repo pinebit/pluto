@@ -55,7 +55,7 @@ pub const SUPPORTED: &'static [SemVer] = {
 };
 
 /// The type of semantic version, i.e., minor, patch, or pre-release.
-#[derive(Eq, PartialEq, Debug)]
+#[derive(Eq, PartialEq, Debug, Copy, Clone)]
 pub enum SemVerType {
     /// Only major and minor version present, e.g., v1.2
     Minor,
@@ -68,7 +68,7 @@ pub enum SemVerType {
 /// Represents a semantic version. A valid [`SemVer`] contains a major and minor
 /// version and optionally either a patch version or a pre-release label,
 /// i.e., v1.2 or v1.2.3 or v1.2-rc.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct SemVer {
     sem_ver_type: SemVerType,
     major: usize,
@@ -85,7 +85,7 @@ impl SemVer {
 
     /// Produces the minor version of the semantic version.
     /// It strips the [`patch`] version and [`pre_release`] label if present.
-    pub const fn is_minor(&self) -> SemVer {
+    pub const fn to_minor(&self) -> SemVer {
         Self {
             sem_ver_type: SemVerType::Minor,
             major: self.major,
@@ -189,5 +189,57 @@ impl TryFrom<&str> for SemVer {
             pre_release: pre_release.to_string(),
             sem_ver_type,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::cmp;
+
+    use crate::version::{SUPPORTED, SemVer, VERSION};
+
+    #[test]
+    fn semver_compare() {
+        let tc = vec![
+            ("v0.1.0", "v0.1.0", cmp::Ordering::Equal),
+            ("v0.1.0", "v0.1.1", cmp::Ordering::Less),
+            ("v0.1.1", "v0.1.0", cmp::Ordering::Greater),
+            ("v0.1.1", "v0.1", cmp::Ordering::Equal),
+            ("v0.2.1", "v0.1", cmp::Ordering::Greater),
+            ("v0.1", "v0.1-dev", cmp::Ordering::Equal),
+            ("v0.1-dev", "v0.2", cmp::Ordering::Less),
+        ];
+
+        for (a, b, expected) in tc {
+            let ver_a = SemVer::try_from(a).unwrap();
+            let ver_b = SemVer::try_from(b).unwrap();
+            assert_eq!(ver_a.partial_cmp(&ver_b).unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn is_pre_release() {
+        let pre_release = SemVer::try_from("v0.17.1-rc1").unwrap();
+        assert!(pre_release.is_pre_release());
+
+        let release = SemVer::try_from("v0.17.1").unwrap();
+        assert!(!release.is_pre_release());
+    }
+
+    #[test]
+    fn current_in_supported() {
+        assert_eq!(*VERSION, SUPPORTED[0]);
+    }
+
+    #[test]
+    fn supported_are_minors() {
+        for v in SUPPORTED {
+            assert_eq!(*v, v.to_minor());
+        }
+    }
+
+    #[test]
+    fn multi_supported() {
+        assert!(SUPPORTED.len() >= 1);
     }
 }
