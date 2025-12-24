@@ -1,12 +1,10 @@
 use std::{cmp, fmt, str, sync::LazyLock};
 
-use std::{cmp, fmt, sync::LazyLock};
-
-type Result<T> = std::result::Result<T, VersionError>;
+type Result<T> = std::result::Result<T, SemVerError>;
 
 /// Errors that can occur when parsing or handling semantic versions.
-#[derive(Debug, thiserror::Error)]
-pub enum VersionError {
+#[derive(Eq, PartialEq, Debug, thiserror::Error)]
+pub enum SemVerError {
     /// Invalid version format when parsing a semantic version.
     #[error("Invalid version format")]
     InvalidFormat,
@@ -20,8 +18,7 @@ const VERSION_STR: &'static str = "v1.7.1";
 ///     - Release branch: v0.Y-rc
 pub static VERSION: LazyLock<SemVer> = LazyLock::new(|| SemVer::try_from(VERSION_STR).unwrap());
 
-// These variables are populated with build information via -ldflags when
-// binaries are built, but not in Dockerfile.
+// TODO: Populate at build time
 const VCS_REVISION: &'static str = "";
 const VCS_TIME: &'static str = "";
 
@@ -207,12 +204,11 @@ impl str::FromStr for SemVer {
 
 #[cfg(test)]
 mod tests {
+    use crate::version::{SUPPORTED, SemVer, SemVerError, SemVerType, VERSION, VERSION_STR};
     use std::cmp;
 
-    use crate::version::{SUPPORTED, SemVer, VERSION};
-
     #[test]
-    fn semver_compare() {
+    fn compare() {
         let tc = vec![
             ("v0.1.0", "v0.1.0", cmp::Ordering::Equal),
             ("v0.1.0", "v0.1.1", cmp::Ordering::Less),
@@ -254,5 +250,81 @@ mod tests {
     #[test]
     fn multi_supported() {
         assert!(SUPPORTED.len() >= 1);
+    }
+
+    #[test]
+    fn valid_version() {
+        let version = VERSION_STR.parse::<SemVer>().unwrap();
+        assert_eq!(*VERSION, version);
+    }
+
+    struct ParseTestCase {
+        name: &'static str,
+        version: &'static str,
+        expected: super::Result<SemVer>,
+    }
+
+    #[test]
+    fn parse() {
+        let tc = vec![
+            ParseTestCase {
+                name: "Patch",
+                version: "v1.2.3",
+                expected: Ok(SemVer {
+                    major: 1,
+                    minor: 2,
+                    patch: 3,
+                    pre_release: String::new(),
+                    sem_ver_type: SemVerType::Patch,
+                }),
+            },
+            ParseTestCase {
+                name: "PreRelease",
+                version: "v0.17-dev",
+                expected: Ok(SemVer {
+                    major: 0,
+                    minor: 17,
+                    patch: 0,
+                    pre_release: "dev".to_string(),
+                    sem_ver_type: SemVerType::PreRelease,
+                }),
+            },
+            ParseTestCase {
+                name: "Minor",
+                version: "v0.1",
+                expected: Ok(SemVer {
+                    major: 0,
+                    minor: 1,
+                    patch: 0,
+                    pre_release: String::new(),
+                    sem_ver_type: SemVerType::Minor,
+                }),
+            },
+            ParseTestCase {
+                name: "Empty",
+                version: "",
+                expected: Err(SemVerError::InvalidFormat),
+            },
+            ParseTestCase {
+                name: "Invalid 1",
+                version: "invalid",
+                expected: Err(SemVerError::InvalidFormat),
+            },
+            ParseTestCase {
+                name: "No v prefix",
+                version: "1.2.3",
+                expected: Err(SemVerError::InvalidFormat),
+            },
+            ParseTestCase {
+                name: "Invalid 2",
+                version: "12-dev",
+                expected: Err(SemVerError::InvalidFormat),
+            },
+        ];
+
+        for test in tc {
+            let actual = SemVer::parse(test.version);
+            assert_eq!(actual, test.expected, "parse: `{}`", test.name);
+        }
     }
 }
