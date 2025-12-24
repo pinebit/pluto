@@ -14,13 +14,14 @@ pub enum SemVerError {
 ///     - Main branch: v0.X-dev
 ///     - Release branch: v0.Y-rc
 pub static VERSION: LazyLock<SemVer> = LazyLock::new(|| {
-    let str = option_env!("CHARON_VERSION").unwrap_or("v0.1.0-dev");
+    // Overwritten at build-time with the git tag for official releases
+    let str = option_env!("CHARON_VERSION").unwrap_or("v1.7-rc");
 
-    SemVer::try_from(str).unwrap()
+    SemVer::try_from(str).expect("invalid semantic version")
 });
 
 /// Supported minor versions in order of precedence.
-pub const SUPPORTED: &'static [SemVer] = {
+pub const SUPPORTED: &[SemVer] = {
     const fn v(major: usize, minor: usize) -> SemVer {
         SemVer {
             sem_ver_type: SemVerType::Minor,
@@ -80,8 +81,9 @@ pub struct SemVer {
     pre_release: String,
 }
 
-static SEMVER_REGEX: LazyLock<regex::Regex> =
-    LazyLock::new(|| regex::Regex::new(r"^v(\d+)\.(\d+)(?:\.(\d+))?(?:-(.+))?$").unwrap());
+static SEMVER_REGEX: LazyLock<regex::Regex> = LazyLock::new(|| {
+    regex::Regex::new(r"^v(\d+)\.(\d+)(?:\.(\d+))?(?:-(.+))?$").expect("invalid regex")
+});
 
 impl SemVer {
     /// Returns true if the [`SemVer`] represents a tag for a pre-release.
@@ -108,15 +110,15 @@ impl SemVer {
             .filter(|matches| !(matches.len() == 0 || matches.len() != 5))
             .ok_or(SemVerError::InvalidFormat)?;
 
-        let major = matches[1].parse().expect("regex ensures number");
-        let minor = matches[2].parse().expect("regex ensures number");
+        let major = matches[1].parse().expect("invalid regex");
+        let minor = matches[2].parse().expect("invalid regex");
 
         let mut patch = 0;
         let mut pre_release = "";
         let mut sem_ver_type = SemVerType::Minor;
 
         if let Some(m) = matches.get(3) {
-            patch = m.as_str().parse().expect("regex ensures number");
+            patch = m.as_str().parse().expect("invalid regex");
             sem_ver_type = SemVerType::Patch;
         }
 
@@ -153,7 +155,9 @@ impl fmt::Display for SemVer {
 
 impl PartialEq for SemVer {
     fn eq(&self, other: &Self) -> bool {
-        self.partial_cmp(other).unwrap() == cmp::Ordering::Equal
+        self.partial_cmp(other)
+            .expect("SemVer comparison should always succeed")
+            == cmp::Ordering::Equal
     }
 }
 
@@ -188,7 +192,7 @@ impl PartialOrd for SemVer {
             return Some(cmp::Ordering::Less);
         }
 
-        return Some(cmp::Ordering::Greater);
+        Some(cmp::Ordering::Greater)
     }
 }
 
@@ -254,8 +258,9 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::const_is_empty, reason = "SUPPORTED should never be empty")]
     fn multi_supported() {
-        assert!(SUPPORTED.len() >= 1);
+        assert!(!SUPPORTED.is_empty());
     }
 
     #[test]
