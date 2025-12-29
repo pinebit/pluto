@@ -13,7 +13,7 @@ use crate::{
     gater::ConnGater,
     p2p::Node,
     relay::{
-        Result,
+        RelayP2PError, Result,
         config::{Config, create_relay_config},
         web::enr_server,
     },
@@ -39,11 +39,15 @@ pub async fn run_relay_p2p_node(
 
     for tcp_addr in config.p2p_config.tcp_addrs.iter() {
         debug!("Listening on TCP address {}", tcp_addr);
-        node.swarm.listen_on(tcp_addr.parse().unwrap()).unwrap();
+        node.swarm
+            .listen_on(tcp_addr.parse()?)
+            .map_err(RelayP2PError::FailedToListenOnAddress)?;
     }
     for udp_addr in config.p2p_config.udp_addrs.iter() {
         debug!("Listening on UDP address {}", udp_addr);
-        node.swarm.listen_on(udp_addr.parse().unwrap()).unwrap();
+        node.swarm
+            .listen_on(udp_addr.parse()?)
+            .map_err(RelayP2PError::FailedToListenOnAddress)?;
     }
 
     let (server_errors, mut server_errors_receiver) = mpsc::channel(3);
@@ -73,12 +77,9 @@ pub async fn run_relay_p2p_node(
                 break;
             },
             error = server_errors_receiver.recv() => {
-                match error {
-                    Some(error) => {
-                        warn!("Server error: {}", error);
-                        return Err(error);
-                    }
-                    None => {},
+                if let Some(error) = error {
+                    warn!("Server error: {}", error);
+                    return Err(error);
                 }
             },
             event = node.swarm.select_next_some() => {

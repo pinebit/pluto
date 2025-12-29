@@ -5,9 +5,13 @@ use libp2p::relay;
 
 use crate::config::P2PConfig;
 
+/// One hour in seconds.
 pub const ONE_HOUR_SECONDS: u64 = 60 * 60;
+/// One minute in seconds.
 pub const ONE_MINUTE_SECONDS: u64 = 60;
+/// 32 MB in bytes.
 pub const MB_32: u64 = 32 * 1024 * 1024;
+/// External host resolve interval.
 pub const EXTERNAL_HOST_RESOLVE_INTERVAL: Duration = Duration::from_secs(5 * 60);
 
 // todo: make more typed
@@ -39,35 +43,6 @@ pub struct Config {
 }
 
 impl Config {
-    /// Creates a new configuration.
-    pub fn new(
-        data_dir: PathBuf,
-        http_addr: Option<String>,
-        monitoring_addr: String,
-        debug_addr: String,
-        p2p_config: P2PConfig,
-        log_config: TracingConfig,
-        auto_p2p_key: bool,
-        max_res_per_peer: usize,
-        max_conns: usize,
-        filter_private_addrs: bool,
-        libp2p_log_level: String,
-    ) -> Self {
-        Self {
-            data_dir,
-            http_addr,
-            monitoring_addr,
-            debug_addr,
-            p2p_config,
-            log_config,
-            auto_p2p_key,
-            max_res_per_peer,
-            max_conns,
-            filter_private_addrs,
-            libp2p_log_level,
-        }
-    }
-
     /// Returns a new builder for configuring a relay P2P layer.
     pub fn builder() -> ConfigBuilder {
         ConfigBuilder::new()

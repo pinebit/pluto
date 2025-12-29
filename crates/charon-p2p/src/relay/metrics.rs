@@ -2,6 +2,7 @@ use vise::*;
 
 use crate::metrics::BUCKETS;
 
+/// Metrics for the relay P2P layer.
 #[derive(Debug, Metrics)]
 #[metrics(prefix = "relay_p2p")]
 pub struct RelayMetrics {
@@ -22,11 +23,13 @@ pub struct RelayMetrics {
     ping_latency: Family<PeerWithPeerClusterLabels, Histogram>,
 }
 
+/// Labels for peer with peer cluster.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, EncodeLabelSet)]
 pub struct PeerWithPeerClusterLabels {
     peer: String,
     peer_cluster: String,
 }
 
+/// Global metrics for the relay P2P layer.
 #[vise::register]
 pub static RELAY_METRICS: Global<RelayMetrics> = Global::new();

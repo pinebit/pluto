@@ -1,4 +1,3 @@
-#![allow(missing_docs)]
 //! Everything related to relay client / server.
 
 /// P2P.
@@ -19,4 +18,6 @@ pub mod error;
 /// Utils.
 pub mod utils;
 
-pub use error::{RelayP2PError, Result};
+pub use error::RelayP2PError;
+
+pub(crate) use error::Result;

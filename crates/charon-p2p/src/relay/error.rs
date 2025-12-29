@@ -1,3 +1,5 @@
+use libp2p::multiaddr;
+
 use crate::p2p::P2PError;
 
 /// Relay P2P error.
@@ -18,6 +20,15 @@ pub enum RelayP2PError {
     /// Failed to serve HTTP.
     #[error("Failed to serve HTTP: {0}")]
     FailedToServeHTTP(std::io::Error),
+
+    /// Failed to listen on address.
+    #[error("Failed to listen on address: {0}")]
+    FailedToListenOnAddress(libp2p::TransportError<std::io::Error>),
+
+    /// Failed to parse multiaddress.
+    #[error("Failed to parse multiaddress: {0}")]
+    FailedToParseMultiaddr(#[from] multiaddr::Error),
 }
 
-pub type Result<T> = std::result::Result<T, RelayP2PError>;
+/// Relay P2P result.
+pub(crate) type Result<T> = std::result::Result<T, RelayP2PError>;

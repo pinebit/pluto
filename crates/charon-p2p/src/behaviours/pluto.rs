@@ -32,7 +32,7 @@ impl PlutoBehaviour {
 }
 
 /// Builder for [`PlutoBehaviour`].
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct PlutoBehaviourBuilder {
     gater: Option<ConnGater>,
     identify_protocol: String,

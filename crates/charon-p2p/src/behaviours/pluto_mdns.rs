@@ -26,18 +26,10 @@ impl PlutoMdnsBehaviour {
 }
 
 /// Builder for [`PlutoMdnsBehaviour`].
+#[derive(Default, Debug, Clone)]
 pub struct PlutoMdnsBehaviourBuilder {
     pluto: PlutoBehaviourBuilder,
     mdns_config: mdns::Config,
-}
-
-impl Default for PlutoMdnsBehaviourBuilder {
-    fn default() -> Self {
-        Self {
-            pluto: PlutoBehaviourBuilder::default(),
-            mdns_config: mdns::Config::default(),
-        }
-    }
 }
 
 impl PlutoMdnsBehaviourBuilder {

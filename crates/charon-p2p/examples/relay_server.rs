@@ -14,14 +14,14 @@ use tracing::info;
 
 #[tokio::main]
 async fn main() {
-    charon_tracing::init(&TracingConfig::default()).unwrap();
+    charon_tracing::init(&TracingConfig::default()).expect("Failed to initialize tracing");
 
     let config = Config::builder()
         .with_p2p_config(
             P2PConfig::builder()
                 .with_tcp_addrs(vec![
                     multiaddr::Multiaddr::from_str("/ip4/0.0.0.0/tcp/0")
-                        .unwrap()
+                        .expect("Failed to parse multiaddress")
                         .to_string(),
                 ])
                 .build(),
@@ -36,12 +36,12 @@ async fn main() {
 
     tokio::select! {
         result = run_relay_p2p_node(&config, key, ct.child_token()) => {
-            result.unwrap();
+            result.expect("Failed to run relay P2P node");
         }
         _ = tokio::signal::ctrl_c() => {
             info!("Shutdown signal received, shutting down gracefully...");
             ct.cancel();
-            
+
         }
     }
 
