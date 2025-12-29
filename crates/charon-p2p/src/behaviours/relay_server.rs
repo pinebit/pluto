@@ -1,0 +1,112 @@
+//! Relay server behaviour.
+
+use std::time::Duration;
+
+use libp2p::{identify, identity::Keypair, ping, relay, swarm::NetworkBehaviour};
+
+use crate::gater::ConnGater;
+
+/// Relay server network behaviour.
+#[derive(NetworkBehaviour)]
+pub struct RelayServerBehaviour {
+    /// Relay server.
+    pub relay: relay::Behaviour,
+    /// Identify behaviour.
+    pub identify: identify::Behaviour,
+    /// Ping behaviour.
+    pub ping: ping::Behaviour,
+    /// Gater behaviour.
+    pub gater: ConnGater,
+}
+
+impl RelayServerBehaviour {
+    /// Creates a new RelayServerBehaviour with default configuration.
+    pub fn new(key: &Keypair) -> Self {
+        RelayServerBehaviourBuilder::default().build(key)
+    }
+
+    /// Returns a new builder for configuring a RelayServerBehaviour.
+    pub fn builder() -> RelayServerBehaviourBuilder {
+        RelayServerBehaviourBuilder::default()
+    }
+}
+
+/// Builder for [`RelayServerBehaviour`].
+pub struct RelayServerBehaviourBuilder {
+    gater: Option<ConnGater>,
+    identify_protocol: String,
+    ping_interval: Duration,
+    ping_timeout: Duration,
+    relay_config: Option<relay::Config>,
+}
+
+impl Default for RelayServerBehaviourBuilder {
+    fn default() -> Self {
+        Self {
+            gater: None,
+            identify_protocol: "/pluto/relay/1.0.0-alpha".into(),
+            ping_interval: Duration::from_secs(1),
+            ping_timeout: Duration::from_secs(2),
+            relay_config: None,
+        }
+    }
+}
+
+impl RelayServerBehaviourBuilder {
+    /// Creates a new builder with default configuration.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets the connection gater.
+    pub fn with_gater(mut self, gater: ConnGater) -> Self {
+        self.gater = Some(gater);
+        self
+    }
+
+    /// Sets the identify protocol string.
+    pub fn with_identify_protocol(mut self, protocol: impl Into<String>) -> Self {
+        self.identify_protocol = protocol.into();
+        self
+    }
+
+    /// Sets the ping interval.
+    pub fn with_ping_interval(mut self, interval: Duration) -> Self {
+        self.ping_interval = interval;
+        self
+    }
+
+    /// Sets the ping timeout.
+    pub fn with_ping_timeout(mut self, timeout: Duration) -> Self {
+        self.ping_timeout = timeout;
+        self
+    }
+
+    /// Sets the relay server configuration.
+    pub fn with_relay_config(mut self, config: relay::Config) -> Self {
+        self.relay_config = Some(config);
+        self
+    }
+
+    /// Builds the [`RelayServerBehaviour`] with the provided keypair.
+    pub fn build(self, key: &Keypair) -> RelayServerBehaviour {
+        RelayServerBehaviour {
+            relay: relay::Behaviour::new(
+                key.public().to_peer_id(),
+                self.relay_config.unwrap_or_default(),
+            ),
+            identify: identify::Behaviour::new(identify::Config::new(
+                self.identify_protocol,
+                key.public(),
+            )),
+            ping: ping::Behaviour::new(
+                ping::Config::new()
+                    .with_interval(self.ping_interval)
+                    .with_timeout(self.ping_timeout),
+            ),
+            gater: self
+                .gater
+                .unwrap_or_else(|| ConnGater::new_conn_gater(vec![], vec![])),
+        }
+    }
+}

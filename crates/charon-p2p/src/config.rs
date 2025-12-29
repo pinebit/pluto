@@ -59,10 +59,10 @@ pub struct P2PConfig {
     pub relays: Vec<Multiaddr>,
 
     /// The external IP address of the node.
-    pub external_ip: String,
+    pub external_ip: Option<String>,
 
     /// The external host of the node.
-    pub external_host: String,
+    pub external_host: Option<String>,
 
     /// The TCP addresses of the node.
     pub tcp_addrs: Vec<String>,
@@ -97,6 +97,67 @@ impl P2PConfig {
         let addrs = self.parse_tcp_addrs()?;
 
         addrs.into_iter().map(multi_addr_from_ip_tcp_port).collect()
+    }
+
+    /// Returns a new builder for configuring a P2P configuration.
+    pub fn builder() -> P2PConfigBuilder {
+        P2PConfigBuilder::new()
+    }
+}
+
+/// Builder for [`P2PConfig`].
+#[derive(Default, Debug, Clone)]
+pub struct P2PConfigBuilder {
+    config: P2PConfig,
+}
+
+impl P2PConfigBuilder {
+    /// Creates a new builder with default configuration.
+    pub fn new() -> Self {
+        Self {
+            config: P2PConfig::default(),
+        }
+    }
+
+    /// Sets the relay multiaddrs.
+    pub fn with_relays(mut self, relays: Vec<Multiaddr>) -> Self {
+        self.config.relays = relays;
+        self
+    }
+
+    /// Sets the external IP address.
+    pub fn with_external_ip(mut self, external_ip: String) -> Self {
+        self.config.external_ip = Some(external_ip);
+        self
+    }
+
+    /// Sets the external host.
+    pub fn with_external_host(mut self, external_host: String) -> Self {
+        self.config.external_host = Some(external_host);
+        self
+    }
+
+    /// Sets the TCP addresses.
+    pub fn with_tcp_addrs(mut self, tcp_addrs: Vec<String>) -> Self {
+        self.config.tcp_addrs = tcp_addrs;
+        self
+    }
+
+    /// Sets the UDP addresses.
+    pub fn with_udp_addrs(mut self, udp_addrs: Vec<String>) -> Self {
+        self.config.udp_addrs = udp_addrs;
+        self
+    }
+
+    /// Sets whether to disable the reuse port.
+    pub fn with_disable_reuse_port(mut self, disable_reuse_port: bool) -> Self {
+        self.config.disable_reuse_port = disable_reuse_port;
+        self
+    }
+
+    /// Builds the [`P2PConfig`].
+    pub fn build(self) -> P2PConfig {
+        self.config
     }
 }
 

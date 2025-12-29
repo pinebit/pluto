@@ -1538,17 +1538,23 @@ name = "charon-p2p"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "axum",
  "charon-eth2",
  "charon-k1util",
  "charon-testutil",
+ "charon-tracing",
  "chrono",
  "clap",
  "k256",
  "libp2p",
  "rand 0.8.5",
+ "serde",
+ "serde_json",
  "tempfile",
  "thiserror 2.0.17",
  "tokio",
+ "tokio-util",
+ "tracing",
  "vise",
  "vise-exporter",
 ]

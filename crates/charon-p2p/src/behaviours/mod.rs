@@ -7,3 +7,6 @@ pub mod pluto;
 #[cfg(feature = "mdns")]
 /// Pluto Mdns behaviour.
 pub mod pluto_mdns;
+
+/// Relay server behaviour.
+pub mod relay_server;

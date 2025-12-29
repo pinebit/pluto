@@ -1,0 +1,23 @@
+use crate::p2p::P2PError;
+
+/// Relay P2P error.
+#[derive(Debug, thiserror::Error)]
+pub enum RelayP2PError {
+    /// Failed to load private key.
+    #[error("Failed to load private key")]
+    FailedToLoadPrivateKey(#[from] crate::k1::K1Error),
+
+    /// P2P error.
+    #[error("P2P error: {0}")]
+    P2PError(#[from] P2PError),
+
+    /// Failed to bind HTTP listener.
+    #[error("Failed to bind HTTP listener: {0}")]
+    FailedToBindHttpListener(String),
+
+    /// Failed to serve HTTP.
+    #[error("Failed to serve HTTP: {0}")]
+    FailedToServeHTTP(std::io::Error),
+}
+
+pub type Result<T> = std::result::Result<T, RelayP2PError>;
