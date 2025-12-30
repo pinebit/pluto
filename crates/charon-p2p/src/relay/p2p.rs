@@ -1,5 +1,3 @@
-#![allow(missing_docs)]
-
 use std::{sync::Arc, time::Duration};
 
 use k256::SecretKey;
@@ -19,6 +17,7 @@ use crate::{
     },
 };
 
+/// Runs a relay P2P node.
 #[instrument(skip(config, key, ct))]
 pub async fn run_relay_p2p_node(
     config: &Config,

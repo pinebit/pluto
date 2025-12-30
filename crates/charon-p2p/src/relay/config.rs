@@ -14,7 +14,6 @@ pub const MB_32: u64 = 32 * 1024 * 1024;
 /// External host resolve interval.
 pub const EXTERNAL_HOST_RESOLVE_INTERVAL: Duration = Duration::from_secs(5 * 60);
 
-// todo: make more typed
 /// Configuration for the relay P2P layer.
 #[derive(Default, Debug, Clone)]
 pub struct Config {
