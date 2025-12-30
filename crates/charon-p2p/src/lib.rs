@@ -28,6 +28,3 @@ pub mod behaviours;
 
 /// K1 utilities.
 pub mod k1;
-
-/// Everything related to relay client / server.
-pub mod relay;

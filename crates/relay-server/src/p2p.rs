@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use std::{sync::Arc, time::Duration};
 
 use k256::SecretKey;
@@ -7,15 +9,13 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, instrument, warn};
 
 use crate::{
-    behaviours::relay_server::RelayServerBehaviour,
-    gater::ConnGater,
-    p2p::Node,
-    relay::{
-        RelayP2PError, Result,
-        config::{Config, create_relay_config},
-        web::enr_server,
-    },
+    Result,
+    behaviour::RelayServerBehaviour,
+    config::{Config, create_relay_config},
+    error::RelayP2PError,
+    web::enr_server,
 };
+use charon_p2p::{gater::ConnGater, p2p::Node};
 
 /// Runs a relay P2P node.
 #[instrument(skip(config, key, ct))]

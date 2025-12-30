@@ -3,7 +3,7 @@ use std::{path::PathBuf, time::Duration};
 use charon_tracing::TracingConfig;
 use libp2p::relay;
 
-use crate::config::P2PConfig;
+use charon_p2p::config::P2PConfig;
 
 /// One hour in seconds.
 pub const ONE_HOUR_SECONDS: u64 = 60 * 60;

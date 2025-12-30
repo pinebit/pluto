@@ -1,10 +1,11 @@
+#![allow(missing_docs)] // we need to allow missing docs for the derive macro
 //! Relay server behaviour.
 
 use std::time::Duration;
 
 use libp2p::{identify, identity::Keypair, ping, relay, swarm::NetworkBehaviour};
 
-use crate::gater::ConnGater;
+use charon_p2p::gater::ConnGater;
 
 /// Relay server network behaviour.
 #[derive(NetworkBehaviour)]

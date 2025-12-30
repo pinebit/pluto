@@ -3,7 +3,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::relay::utils;
+use crate::utils;
 use axum::{
     Json, Router,
     extract::State,
@@ -21,13 +21,10 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, instrument, warn};
 
 use crate::{
-    config::P2PConfig,
-    name::peer_name,
-    relay::{
-        config::{Config, EXTERNAL_HOST_RESOLVE_INTERVAL},
-        error::RelayP2PError,
-    },
+    config::{Config, EXTERNAL_HOST_RESOLVE_INTERVAL},
+    error::RelayP2PError,
 };
+use charon_p2p::{config::P2PConfig, name::peer_name};
 
 /// Shared application state for HTTP handlers.
 #[derive(Clone)]

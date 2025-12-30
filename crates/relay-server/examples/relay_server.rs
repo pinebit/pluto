@@ -1,10 +1,8 @@
 #![allow(missing_docs)]
 use std::str::FromStr;
 
-use charon_p2p::{
-    config::P2PConfig,
-    relay::{config::Config, p2p::run_relay_p2p_node},
-};
+use charon_p2p::config::P2PConfig;
+use charon_relay_server::{config::Config, p2p::run_relay_p2p_node};
 use charon_tracing::TracingConfig;
 use k256::SecretKey;
 use libp2p::multiaddr;
