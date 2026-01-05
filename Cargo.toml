@@ -12,7 +12,8 @@ members = [
     "crates/charon-p2p",
     "crates/charon-testutil",
     "crates/tracing",
-    "crates/relay-server"
+    "crates/relay-server",
+    "crates/peerinfo"
 ]
 resolver = "3"
 
@@ -67,6 +68,7 @@ charon-p2p = { path = "crates/charon-p2p" }
 charon-testutil = { path = "crates/charon-testutil" }
 charon-tracing = { path = "crates/tracing" }
 charon-relay-server = { path = "crates/relay-server" }
+charon-peerinfo = { path = "crates/peerinfo" }
 
 [workspace.lints.rust]
 missing_docs = "deny"
