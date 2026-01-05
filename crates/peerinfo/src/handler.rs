@@ -271,9 +271,6 @@ type RequestFuture = BoxFuture<'static, Result<(Stream, PeerInfo), Failure>>;
 type InboundFuture = BoxFuture<'static, Result<(Stream, PeerInfo), std::io::Error>>;
 
 /// The current state w.r.t. outbound peer info requests.
-///
-/// Note: We use a new stream for each request because the protocol uses
-/// half-close pattern (stream is closed after each exchange).
 enum OutboundState {
     /// A new substream is being negotiated for the peerinfo protocol.
     OpenStream,
