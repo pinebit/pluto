@@ -18,6 +18,9 @@ tracing.workspace = true
 chrono.workspace = true
 unsigned-varint = { version = "0.8", features = ["futures"] }
 vise.workspace = true
+charon-core.workspace = true
+charon-p2p.workspace = true
+parking_lot.workspace = true
 
 [build-dependencies]
 charon-build-proto.workspace = true
@@ -28,6 +31,7 @@ clap.workspace = true
 tokio.workspace = true
 tracing-subscriber.workspace = true
 hex.workspace = true
+vise-exporter.workspace = true
 
 [lints]
 workspace = true

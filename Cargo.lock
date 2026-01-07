@@ -1599,12 +1599,15 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "charon-build-proto",
+ "charon-core",
+ "charon-p2p",
  "chrono",
  "clap",
  "futures",
  "futures-timer",
  "hex",
  "libp2p",
+ "parking_lot",
  "prost 0.14.1",
  "prost-types 0.14.1",
  "regex",
@@ -1614,6 +1617,7 @@ dependencies = [
  "tracing-subscriber",
  "unsigned-varint 0.8.0",
  "vise",
+ "vise-exporter",
 ]
 
 [[package]]

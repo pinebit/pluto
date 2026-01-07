@@ -22,8 +22,8 @@ pub struct Config {
     interval: Duration,
     /// Local peer info to send to other peers.
     local_info: LocalPeerInfo,
-    /// Peer ID of the local peer.
-    peer_id: PeerId,
+    /// Known peers.
+    peers: Vec<PeerId>,
 }
 
 /// Local peer information to be shared with other peers.
@@ -74,7 +74,7 @@ impl LocalPeerInfo {
             git_hash: self.git_hash.clone(),
             sent_at: Some(Timestamp {
                 seconds: now.timestamp(),
-                nanos: 0,
+                nanos: i32::try_from(now.timestamp_subsec_nanos()).unwrap_or(0),
             }),
             started_at: self.started_at,
             builder_api_enabled: self.builder_api_enabled,
@@ -94,12 +94,12 @@ impl Config {
     /// * A peer info request is sent every 60 seconds on a healthy connection.
     /// * Every request must yield a response within 20 seconds to be
     ///   successful.
-    pub fn new(local_info: LocalPeerInfo, peer_id: PeerId) -> Self {
+    pub fn new(local_info: LocalPeerInfo) -> Self {
         Self {
             timeout: DEFAULT_TIMEOUT,
             interval: DEFAULT_INTERVAL,
             local_info,
-            peer_id,
+            peers: Vec::new(),
         }
     }
 
@@ -121,20 +121,15 @@ impl Config {
         self
     }
 
-    /// Sets the peer ID.
-    pub fn with_peer_id(mut self, peer_id: PeerId) -> Self {
-        self.peer_id = peer_id;
+    /// Sets the known peers.
+    pub fn with_peers(mut self, peers: Vec<PeerId>) -> Self {
+        self.peers = peers;
         self
     }
 
     /// Returns the local peer info.
     pub fn local_info(&self) -> &LocalPeerInfo {
         &self.local_info
-    }
-
-    /// Returns the peer ID.
-    pub fn peer_id(&self) -> &PeerId {
-        &self.peer_id
     }
 
     /// Returns the timeout.
@@ -145,5 +140,10 @@ impl Config {
     /// Returns the interval.
     pub fn interval(&self) -> Duration {
         self.interval
+    }
+
+    /// Returns the known peers.
+    pub fn peers(&self) -> &[PeerId] {
+        &self.peers
     }
 }

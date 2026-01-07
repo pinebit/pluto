@@ -13,7 +13,7 @@
 //! Terminal 1: `cargo run --example peerinfo -p charon-peerinfo -- --port 4001`
 //! Terminal 2: `cargo run --example peerinfo -p charon-peerinfo -- --port 4002`
 #![allow(missing_docs)]
-use std::time::Duration;
+use std::{net::SocketAddr, time::Duration};
 
 use charon_peerinfo::{Behaviour, Config, Event, LocalPeerInfo};
 use clap::Parser;
@@ -26,6 +26,7 @@ use libp2p::{
 };
 use tokio::signal;
 use tracing_subscriber::EnvFilter;
+use vise_exporter::MetricsExporter;
 
 /// Command line arguments
 #[derive(Debug, Parser)]
@@ -73,9 +74,7 @@ fn build_swarm(
         )?
         .with_behaviour(|key| {
             Ok(CombinedBehaviour {
-                peer_info: Behaviour::new(
-                    Config::new(peerinfo_config, key.public().to_peer_id()).with_interval(interval),
-                ),
+                peer_info: Behaviour::new(Config::new(peerinfo_config).with_interval(interval)),
                 identify: identify::Behaviour::new(identify::Config::new(
                     "/peerinfo-example/1.0.0".to_string(),
                     key.public(),
@@ -174,6 +173,20 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env().add_directive("debug".parse()?))
         .init();
+
+    // Run the metrics exporter
+    let bind_address = SocketAddr::from(([0, 0, 0, 0], 9465));
+
+    let exporter = MetricsExporter::default()
+        .bind(bind_address)
+        .await
+        .expect("Failed to bind metrics exporter");
+    tokio::spawn(async move {
+        exporter
+            .start()
+            .await
+            .expect("Failed to start metrics exporter");
+    });
 
     let args = Args::parse();
 

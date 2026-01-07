@@ -77,14 +77,17 @@ impl Behaviour {
             chrono::Utc::now().timestamp()
         };
 
-        let started_at = started_at as f64;
-
         PEERINFO_METRICS.start_time_secs[&name].set(started_at);
 
         if config.local_info().builder_api_enabled {
             PEERINFO_METRICS.builder_api_enabled[&name].set(1);
         } else {
             PEERINFO_METRICS.builder_api_enabled[&name].set(0);
+        }
+
+        for (idx, peer) in config.peers().iter().enumerate() {
+            let peer_name = charon_p2p::name::peer_name(peer);
+            PEERINFO_METRICS.index[&peer_name].set(idx);
         }
 
         Self {
@@ -106,22 +109,22 @@ impl NetworkBehaviour for Behaviour {
     fn handle_established_inbound_connection(
         &mut self,
         _connection_id: ConnectionId,
-        _peer: PeerId,
+        peer: PeerId,
         _local_addr: &Multiaddr,
         _remote_addr: &Multiaddr,
     ) -> Result<THandler<Self>, ConnectionDenied> {
-        Ok(Handler::new(self.config.clone()))
+        Ok(Handler::new(self.config.clone(), peer))
     }
 
     fn handle_established_outbound_connection(
         &mut self,
         _connection_id: ConnectionId,
-        _peer: PeerId,
+        peer: PeerId,
         _addr: &Multiaddr,
         _role_override: libp2p::core::Endpoint,
         _port_use: libp2p::core::transport::PortUse,
     ) -> Result<THandler<Self>, ConnectionDenied> {
-        Ok(Handler::new(self.config.clone()))
+        Ok(Handler::new(self.config.clone(), peer))
     }
 
     fn on_swarm_event(&mut self, _event: FromSwarm) {

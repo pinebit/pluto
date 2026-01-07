@@ -8,7 +8,7 @@ use vise::*;
 pub struct PeerInfoMetrics {
     /// Peer clock offset in seconds.
     #[metrics(labels = ["peer"])]
-    pub clock_offset_seconds: LabeledFamily<String, Gauge<f64>>,
+    pub clock_offset_seconds: LabeledFamily<String, Gauge<i64>>,
 
     /// Constant gauge with version label set to peer's charon version.
     pub version: Family<PeerVersionLabels, Gauge>,
@@ -18,11 +18,11 @@ pub struct PeerInfoMetrics {
 
     /// Constant gauge set to the peer start time of the binary in unix seconds.
     #[metrics(labels = ["peer"])]
-    pub start_time_secs: LabeledFamily<String, Gauge<f64>>,
+    pub start_time_secs: LabeledFamily<String, Gauge<i64>>,
 
     /// Constant gauge set to the peer index in the cluster definition.
     #[metrics(labels = ["peer"])]
-    pub index: LabeledFamily<String, Gauge>,
+    pub index: LabeledFamily<String, Gauge<usize>>,
 
     /// Set to 1 if the peer's version is supported by (compatible with) the
     /// current version, else 0 if unsupported.
