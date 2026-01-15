@@ -13,16 +13,24 @@
 //! Terminal 1: `cargo run --example peerinfo -p charon-peerinfo -- --port 4001`
 //! Terminal 2: `cargo run --example peerinfo -p charon-peerinfo -- --port 4002`
 #![allow(missing_docs)]
-use std::{net::SocketAddr, time::Duration};
+use std::{
+    net::{Ipv4Addr, SocketAddr},
+    path::PathBuf,
+    time::Duration,
+};
 
+use charon_p2p::{
+    config::P2PConfig,
+    k1,
+    p2p::{Node, NodeType},
+};
 use charon_peerinfo::{Behaviour, Config, Event, LocalPeerInfo};
 use clap::Parser;
 use libp2p::{
-    Multiaddr, Swarm, SwarmBuilder,
+    Multiaddr, Swarm,
     futures::StreamExt,
-    identify, mdns, noise, ping,
+    identify, mdns, ping, relay,
     swarm::{NetworkBehaviour, SwarmEvent},
-    tcp, yamux,
 };
 use tokio::signal;
 use tracing_subscriber::EnvFilter;
@@ -48,6 +56,14 @@ pub struct Args {
     /// Peer info exchange interval in seconds
     #[arg(short, long, default_value = "5")]
     pub interval: u64,
+
+    /// Data directory for storing the private key
+    #[arg(long, default_value = ".charon-example")]
+    pub data_dir: PathBuf,
+
+    /// Metrics port to bind to
+    #[arg(long, default_value = "9465")]
+    pub metrics_port: u16,
 }
 
 /// Combined behaviour with peerinfo, identify, ping, and mdns
@@ -56,45 +72,11 @@ pub struct CombinedBehaviour {
     pub peer_info: Behaviour,
     pub identify: identify::Behaviour,
     pub ping: ping::Behaviour,
+    pub relay: relay::client::Behaviour,
     pub mdns: mdns::tokio::Behaviour,
 }
 
 pub type CombinedEvent = CombinedBehaviourEvent;
-
-fn build_swarm(
-    peerinfo_config: LocalPeerInfo,
-    interval: Duration,
-) -> anyhow::Result<Swarm<CombinedBehaviour>> {
-    let swarm = SwarmBuilder::with_new_identity()
-        .with_tokio()
-        .with_tcp(
-            tcp::Config::default(),
-            noise::Config::new,
-            yamux::Config::default,
-        )?
-        .with_behaviour(|key| {
-            Ok(CombinedBehaviour {
-                peer_info: Behaviour::new(Config::new(peerinfo_config).with_interval(interval)),
-                identify: identify::Behaviour::new(identify::Config::new(
-                    "/peerinfo-example/1.0.0".to_string(),
-                    key.public(),
-                )),
-                ping: ping::Behaviour::new(
-                    ping::Config::new()
-                        .with_interval(Duration::from_secs(15))
-                        .with_timeout(Duration::from_secs(10)),
-                ),
-                mdns: mdns::tokio::Behaviour::new(
-                    mdns::Config::default(),
-                    key.public().to_peer_id(),
-                )?,
-            })
-        })?
-        .with_swarm_config(|cfg| cfg.with_idle_connection_timeout(Duration::from_secs(300)))
-        .build();
-
-    Ok(swarm)
-}
 
 fn handle_event(event: SwarmEvent<CombinedEvent>, swarm: &mut Swarm<CombinedBehaviour>) {
     match event {
@@ -114,7 +96,7 @@ fn handle_event(event: SwarmEvent<CombinedEvent>, swarm: &mut Swarm<CombinedBeha
         }
         SwarmEvent::Behaviour(CombinedEvent::PeerInfo(Event::Received { peer, info, .. })) => {
             tracing::info!(
-                "📥 Received PeerInfo from {peer}:\n\
+                "Received PeerInfo from {peer}:\n\
                  │  Version: {}\n\
                  │  Git Hash: {}\n\
                  │  Nickname: {}\n\
@@ -174,8 +156,10 @@ async fn main() -> anyhow::Result<()> {
         .with_env_filter(EnvFilter::from_default_env().add_directive("debug".parse()?))
         .init();
 
+    let args = Args::parse();
+
     // Run the metrics exporter
-    let bind_address = SocketAddr::from(([0, 0, 0, 0], 9465));
+    let bind_address = SocketAddr::from(([0, 0, 0, 0], args.metrics_port));
 
     let exporter = MetricsExporter::default()
         .bind(bind_address)
@@ -188,18 +172,63 @@ async fn main() -> anyhow::Result<()> {
             .expect("Failed to start metrics exporter");
     });
 
-    let args = Args::parse();
+    // Load existing key or create a new one
+    let key = match k1::load_priv_key(&args.data_dir) {
+        Ok(key) => {
+            tracing::info!(
+                "Loaded existing private key from {}",
+                args.data_dir.display()
+            );
+            key
+        }
+        Err(_) => {
+            tracing::info!("Creating new private key in {}", args.data_dir.display());
+            k1::new_saved_priv_key(&args.data_dir)?
+        }
+    };
+    let enr = charon_eth2::enr::Record::new(
+        key.clone(),
+        vec![
+            charon_eth2::enr::with_ip_impl(Ipv4Addr::from([0, 0, 0, 0])),
+            charon_eth2::enr::with_tcp_impl(args.port),
+            charon_eth2::enr::with_udp_impl(args.port),
+        ],
+    )?;
+
+    tracing::info!("ENR: {}", enr);
 
     // Create local peer info
     let local_info = LocalPeerInfo::new(
         "v1.0.0",                     // charon_version
-        vec![0xDE, 0xAD, 0xBE, 0xEF], // lock_hash (example)
+        vec![0x00, 0x00, 0x00, 0x00], // lock_hash (example)
         "abc1234",                    // git_hash
         false,                        // builder_api_enabled
         &args.nickname,               // nickname
     );
 
-    let mut swarm = build_swarm(local_info, Duration::from_secs(args.interval))?;
+    let Node { mut swarm } = Node::new(
+        P2PConfig::default(),
+        key,
+        false,
+        NodeType::TCP,
+        |key, relay_client| CombinedBehaviour {
+            peer_info: Behaviour::new(
+                Config::new(local_info.clone()).with_interval(Duration::from_secs(args.interval)),
+            ),
+            identify: identify::Behaviour::new(identify::Config::new(
+                "/peerinfo-example/1.0.0".to_string(),
+                key.public(),
+            )),
+            ping: ping::Behaviour::new(
+                ping::Config::new()
+                    .with_interval(Duration::from_secs(15))
+                    .with_timeout(Duration::from_secs(10)),
+            ),
+            mdns: mdns::tokio::Behaviour::new(mdns::Config::default(), key.public().to_peer_id())
+                .expect("Failed to create mDNS behaviour"),
+            relay: relay_client,
+        },
+    )?;
 
     let local_peer_id = *swarm.local_peer_id();
     tracing::info!("Local peer id: {local_peer_id}");
