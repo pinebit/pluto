@@ -208,26 +208,6 @@ async fn main() -> anyhow::Result<()> {
         return init_node(&data_dir, &private_key);
     }
 
-    // Run the metrics exporter
-    let bind_address = SocketAddr::from(([0, 0, 0, 0], args.metrics_port));
-
-    let exporter = MetricsExporter::new(
-        MetricsCollection::default()
-            .with_prefix("pluto")
-            .collect()
-            .into(),
-    )
-    .bind(bind_address)
-    .await
-    .expect("Failed to bind metrics exporter");
-
-    tokio::spawn(async move {
-        exporter
-            .start()
-            .await
-            .expect("Failed to start metrics exporter");
-    });
-
     // Load existing key or create a new one
     let key = match k1::load_priv_key(&args.data_dir) {
         Ok(key) => {
@@ -252,6 +232,31 @@ async fn main() -> anyhow::Result<()> {
     )?;
 
     tracing::info!("ENR: {}", enr);
+
+    // Run the metrics exporter
+    let bind_address = SocketAddr::from(([0, 0, 0, 0], args.metrics_port));
+
+    let nickname = args.nickname.to_string();
+    let metrics_collection = MetricsCollection::default().with_labels([
+        ("charon_version", "v1.7.0-dev".to_string()),
+        ("cluster_hash", "0000000".to_string()),
+        ("cluster_name", "".to_string()),
+        ("cluster_network", "mainnet".to_string()),
+        ("cluster_peer", "".to_string()),
+        ("nickname", nickname),
+    ]);
+
+    let exporter = MetricsExporter::new(metrics_collection.collect().into())
+        .bind(bind_address)
+        .await
+        .expect("Failed to bind metrics exporter");
+
+    tokio::spawn(async move {
+        exporter
+            .start()
+            .await
+            .expect("Failed to start metrics exporter");
+    });
 
     // Create local peer info
     let local_info = LocalPeerInfo::new(
