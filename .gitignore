@@ -18,5 +18,4 @@ target/
 # Code coverage output
 lcov.info
 
-# Example data directory
-.charon-example*
+.charon*

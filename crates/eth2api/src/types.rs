@@ -100,7 +100,7 @@ pub struct AggregateAndProofRequestBodyArray2 {
     pub signature: String,
 }
 ///The [`BeaconBlockBody`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/altair/beacon-chain.md#beaconblockbody) object from the CL Altair spec.
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct AltairBeaconBlockBody {
     pub attestations: Vec<GetBlockAttestationsV2ResponseResponseDataArray2>,
     pub attester_slashings: Vec<GetPoolAttesterSlashingsV2ResponseResponseDataArray2>,
@@ -116,7 +116,7 @@ pub struct AltairBeaconBlockBody {
     pub voluntary_exits: Vec<GetPoolVoluntaryExitsResponseResponseDatum>,
 }
 ///The [`Deposit`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/phase0/beacon-chain.md#deposit) object from the CL spec.
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct AltairBeaconBlockBodyDeposit {
     ///The [`DepositData`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/phase0/beacon-chain.md#depositdata) object from the CL spec.
     pub data: AltairBeaconBlockBodyDepositData,
@@ -124,7 +124,7 @@ pub struct AltairBeaconBlockBodyDeposit {
     pub proof: Vec<String>,
 }
 ///The [`DepositData`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/phase0/beacon-chain.md#depositdata) object from the CL spec.
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct AltairBeaconBlockBodyDepositData {
     ///Amount in Gwei.
     pub amount: String,
@@ -154,7 +154,7 @@ pub struct AltairBeaconStateCurrentJustifiedCheckpoint {
     )]
     pub root: String,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct AltairBeaconStateCurrentSyncCommittee {
     ///The validator's BLS public key, uniquely identifying them. _48-bytes, hex encoded with 0x prefix, case insensitive._
     pub aggregate_pubkey: String,
@@ -223,7 +223,7 @@ pub enum AttesterSlashingRequestBody {
     ///The [`AttesterSlashing`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/phase0/beacon-chain.md#attesterslashing) object from the CL spec.
     Object2(GetPoolAttesterSlashingsV2ResponseResponseDataArray2),
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct BeaconCommitteeSelection501Response {
     ///Either specific error code in case of invalid request or http status code
     pub code: f64,
@@ -258,12 +258,12 @@ pub struct BeaconCommitteeSelectionRequestRequestBodyItem {
     #[validate(length(min = 1u64))]
     pub validator_index: String,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct BeaconCommitteeSelectionResponseResponse {
     pub data: Vec<BeaconCommitteeSelectionRequestRequestBodyItem>,
 }
 ///The [`Fork`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/phase0/beacon-chain.md#fork) object from the CL spec.
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct BeaconStateFork {
     ///a fork version number
     pub current_version: String,
@@ -271,7 +271,7 @@ pub struct BeaconStateFork {
     ///a fork version number
     pub previous_version: String,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct BlindedBlock400Response {
     ///Either specific error code in case of invalid request or http status code
     pub code: f64,
@@ -280,7 +280,7 @@ pub struct BlindedBlock400Response {
     ///Optional stacktraces, sent when node is in debug mode
     pub stacktraces: Option<Vec<String>>,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct BlindedBlock406Response {
     ///The media type in "Accept" header is unsupported, and the request has been rejected. This occurs when the server cannot produce a response in the format accepted by the client.
     pub code: f64,
@@ -401,7 +401,7 @@ pub struct BlockRequestBodyObject5 {
     )]
     pub signature: String,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct BlsToExecutionChange400Response {
     ///Either specific error code in case of invalid request or http status code
     pub code: f64,
@@ -410,7 +410,7 @@ pub struct BlsToExecutionChange400Response {
     ///Message describing error
     pub message: String,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct BlsToExecutionChange400ResponseFailure {
     ///Index of item in the request list that caused the error
     pub index: f64,
@@ -633,7 +633,7 @@ pub struct ElectraAttesterSlashingAttestation1 {
     pub signature: String,
 }
 ///The [`Eth1Data`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/phase0/beacon-chain.md#eth1data) object from the CL spec.
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct Eth1Data {
     ///Ethereum 1.x block hash.
     pub block_hash: String,
@@ -903,12 +903,12 @@ pub enum GetAggregatedAttestationV2Response {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetAggregatedAttestationV2ResponseResponse {
     pub data: GetAggregatedAttestationV2ResponseResponseData,
     pub version: ConsensusVersion,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 #[serde(untagged)]
 pub enum GetAggregatedAttestationV2ResponseResponseData {
     ///The [`Attestation`](https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/electra/beacon-chain.md#attestation) object from the CL spec.
@@ -1001,7 +1001,7 @@ pub enum GetAttestationsRewardsResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetAttestationsRewardsResponseResponse {
     ///Rewards info for attestations
     pub data: GetAttestationsRewardsResponseResponseData,
@@ -1011,13 +1011,13 @@ pub struct GetAttestationsRewardsResponseResponse {
     pub finalized: bool,
 }
 ///Rewards info for attestations
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetAttestationsRewardsResponseResponseData {
     pub ideal_rewards: Vec<GetAttestationsRewardsResponseResponseDataIdealReward>,
     pub total_rewards: Vec<GetAttestationsRewardsResponseResponseDataTotalReward>,
 }
 ///Ideal rewards info for a single attestation
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetAttestationsRewardsResponseResponseDataIdealReward {
     ///validator's effective balance in gwei
     pub effective_balance: String,
@@ -1033,7 +1033,7 @@ pub struct GetAttestationsRewardsResponseResponseDataIdealReward {
     pub target: String,
 }
 ///Rewards info for a single attestation
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetAttestationsRewardsResponseResponseDataTotalReward {
     ///attester's reward for head vote in gwei
     pub head: String,
@@ -1139,7 +1139,7 @@ pub enum GetAttesterDutiesResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetAttesterDutiesResponseResponse {
     pub data: Vec<GetAttesterDutiesResponseResponseDatum>,
     ///The block root that this response is dependent on.
@@ -1147,7 +1147,7 @@ pub struct GetAttesterDutiesResponseResponse {
     ///True if the response references an unverified execution payload. Optimistic information may be invalidated at a later time. If the field is not present, assume the False value.
     pub execution_optimistic: bool,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetAttesterDutiesResponseResponseDatum {
     ///The committee index
     pub committee_index: String,
@@ -1271,7 +1271,7 @@ pub enum GetBlindedBlockResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetBlindedBlockResponseResponse {
     pub data: GetBlindedBlockResponseResponseData,
     ///True if the response references an unverified execution payload. Optimistic information may be invalidated at a later time. If the field is not present, assume the False value.
@@ -1531,7 +1531,7 @@ pub enum GetBlobSidecarsResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetBlobSidecarsResponseResponse {
     pub data: GetBlobSidecarsResponseResponseData,
     ///True if the response references an unverified execution payload. Optimistic information may be invalidated at a later time. If the field is not present, assume the False value.
@@ -1540,7 +1540,7 @@ pub struct GetBlobSidecarsResponseResponse {
     pub finalized: bool,
     pub version: GetBlobSidecarsResponseResponseVersion,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 #[serde(untagged)]
 pub enum GetBlobSidecarsResponseResponseData {
     #[default]
@@ -1548,7 +1548,7 @@ pub enum GetBlobSidecarsResponseResponseData {
     Array2(Vec<GetBlobSidecarsResponseResponseDataArray>),
 }
 ///A blob sidecar as defined in the Deneb consensus spec.
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetBlobSidecarsResponseResponseDataArray {
     ///A blob is `FIELD_ELEMENTS_PER_BLOB * size_of(BLSFieldElement) = 4096 * 32 = 131072` bytes (`DATA`) representing a Blob as defined in Deneb
     pub blob: String,
@@ -1561,7 +1561,7 @@ pub struct GetBlobSidecarsResponseResponseDataArray {
     ///The [`SignedBeaconBlockHeader`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/phase0/beacon-chain.md#signedbeaconblockheader) object envelope from the CL spec.
     pub signed_block_header: Phase0ProposerSlashingSignedHeader1,
 }
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, oas3_gen_support::Default)]
 pub enum GetBlobSidecarsResponseResponseVersion {
     #[serde(rename = "deneb")]
     #[default]
@@ -1701,7 +1701,7 @@ pub enum GetBlobsResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetBlobsResponseResponse {
     pub data: Vec<String>,
     ///True if the response references an unverified execution payload. Optimistic information may be invalidated at a later time. If the field is not present, assume the False value.
@@ -1789,7 +1789,7 @@ pub enum GetBlockAttestationsV2Response {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetBlockAttestationsV2ResponseResponse {
     pub data: GetBlockAttestationsV2ResponseResponseData,
     ///True if the response references an unverified execution payload. Optimistic information may be invalidated at a later time. If the field is not present, assume the False value.
@@ -1798,7 +1798,7 @@ pub struct GetBlockAttestationsV2ResponseResponse {
     pub finalized: bool,
     pub version: ConsensusVersion,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 #[serde(untagged)]
 pub enum GetBlockAttestationsV2ResponseResponseData {
     #[default]
@@ -1806,7 +1806,7 @@ pub enum GetBlockAttestationsV2ResponseResponseData {
     Array2(Vec<GetBlockAttestationsV2ResponseResponseDataArray2>),
 }
 ///The [`Attestation`](https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/electra/beacon-chain.md#attestation) object from the CL spec.
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetBlockAttestationsV2ResponseResponseDataArray {
     ///Attester aggregation bits.
     pub aggregation_bits: String,
@@ -1921,7 +1921,7 @@ pub enum GetBlockHeaderResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetBlockHeaderResponseResponse {
     pub data: GetBlockHeadersResponseResponseDatum,
     ///True if the response references an unverified execution payload. Optimistic information may be invalidated at a later time. If the field is not present, assume the False value.
@@ -2012,7 +2012,7 @@ pub enum GetBlockHeadersResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetBlockHeadersResponseResponse {
     pub data: Vec<GetBlockHeadersResponseResponseDatum>,
     ///True if the response references an unverified execution payload. Optimistic information may be invalidated at a later time. If the field is not present, assume the False value.
@@ -2020,7 +2020,7 @@ pub struct GetBlockHeadersResponseResponse {
     ///True if the response references the finalized history of the chain, as determined by fork choice. If the field is not present, additional calls are necessary to compare the epoch of the requested information with the finalized checkpoint.
     pub finalized: bool,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetBlockHeadersResponseResponseDatum {
     pub canonical: bool,
     ///The [`SignedBeaconBlockHeader`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/phase0/beacon-chain.md#signedbeaconblockheader) object envelope from the CL spec.
@@ -2109,7 +2109,7 @@ pub enum GetBlockRewardsResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetBlockRewardsResponseResponse {
     ///Rewards info for a single block
     pub data: GetBlockRewardsResponseResponseData,
@@ -2119,7 +2119,7 @@ pub struct GetBlockRewardsResponseResponse {
     pub finalized: bool,
 }
 ///Rewards info for a single block
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetBlockRewardsResponseResponseData {
     ///block reward component due to included attestations in gwei
     pub attestations: String,
@@ -2214,7 +2214,7 @@ pub enum GetBlockRootResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetBlockRootResponseResponse {
     pub data: GetBlockRootResponseResponseData,
     ///True if the response references an unverified execution payload. Optimistic information may be invalidated at a later time. If the field is not present, assume the False value.
@@ -2222,7 +2222,7 @@ pub struct GetBlockRootResponseResponse {
     ///True if the response references the finalized history of the chain, as determined by fork choice. If the field is not present, additional calls are necessary to compare the epoch of the requested information with the finalized checkpoint.
     pub finalized: bool,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetBlockRootResponseResponseData {
     ///HashTreeRoot of BeaconBlock/BeaconBlockHeader object
     pub root: String,
@@ -2332,7 +2332,7 @@ pub enum GetBlockV2Response {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetBlockV2ResponseResponse {
     pub data: GetBlockV2ResponseResponseData,
     ///True if the response references an unverified execution payload. Optimistic information may be invalidated at a later time. If the field is not present, assume the False value.
@@ -2341,7 +2341,7 @@ pub struct GetBlockV2ResponseResponse {
     pub finalized: bool,
     pub version: ConsensusVersion,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 #[serde(untagged)]
 pub enum GetBlockV2ResponseResponseData {
     ///The [`SignedBeaconBlock`](https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/phase0/beacon-chain.md#signedbeaconblock) object envelope from the CL Electra spec.
@@ -2358,11 +2358,11 @@ pub enum GetBlockV2ResponseResponseData {
     ///The [`SignedBeaconBlock`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/phase0/beacon-chain.md#signedbeaconblock) object envelope from the CL spec.
     Object6(GetBlindedBlockResponseResponseDataObject6),
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetDebugChainHeadsResponseResponse {
     pub data: Vec<GetDebugChainHeadsResponseResponseDatum>,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetDebugChainHeadsResponseResponseDatum {
     ///True if the response references an unverified execution payload. Optimistic information may be invalidated at a later time. If the field is not present, assume the False value.
     pub execution_optimistic: bool,
@@ -2526,7 +2526,7 @@ pub enum GetDebugDataColumnSidecarsResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 #[serde(default)]
 pub struct GetDebugDataColumnSidecarsResponseResponse {
     pub data: Vec<GetDebugDataColumnSidecarsResponseResponseDatum>,
@@ -2538,7 +2538,7 @@ pub struct GetDebugDataColumnSidecarsResponseResponse {
     pub version: String,
 }
 ///A [`DataColumnSidecar`](https://github.com/ethereum/consensus-specs/blob/dev/specs/fulu/das-core.md#datacolumnsidecar) as defined in the Fulu consensus spec.
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetDebugDataColumnSidecarsResponseResponseDatum {
     pub column: Vec<String>,
     pub index: String,
@@ -2622,11 +2622,11 @@ pub enum GetDepositContractResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetDepositContractResponseResponse {
     pub data: GetDepositContractResponseResponseData,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetDepositContractResponseResponseData {
     ///Hex encoded deposit contract address with 0x prefix
     pub address: String,
@@ -2734,7 +2734,7 @@ pub enum GetEpochCommitteesResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetEpochCommitteesResponseResponse {
     pub data: Vec<GetEpochCommitteesResponseResponseDatum>,
     ///True if the response references an unverified execution payload. Optimistic information may be invalidated at a later time. If the field is not present, assume the False value.
@@ -2743,7 +2743,7 @@ pub struct GetEpochCommitteesResponseResponse {
     pub finalized: bool,
 }
 ///Group of validators assigned to attest at specific slot and that have the same committee index (shard in phase 1)
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetEpochCommitteesResponseResponseDatum {
     ///Committee index at a slot
     pub index: String,
@@ -2841,7 +2841,7 @@ pub enum GetEpochSyncCommitteesResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetEpochSyncCommitteesResponseResponse {
     pub data: GetEpochSyncCommitteesResponseResponseData,
     ///True if the response references an unverified execution payload. Optimistic information may be invalidated at a later time. If the field is not present, assume the False value.
@@ -2849,14 +2849,14 @@ pub struct GetEpochSyncCommitteesResponseResponse {
     ///True if the response references the finalized history of the chain, as determined by fork choice. If the field is not present, additional calls are necessary to compare the epoch of the requested information with the finalized checkpoint.
     pub finalized: bool,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetEpochSyncCommitteesResponseResponseData {
     pub validator_aggregates: Vec<Vec<String>>,
     ///all of the validator indices in the current sync committee
     pub validators: Vec<String>,
 }
 ///Debugging context of fork choice
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetForkChoiceResponseResponse {
     ///Optional extra data that clients may provide, which could differ from client to client.
     pub extra_data: Option<serde_json::Value>,
@@ -2868,7 +2868,7 @@ pub struct GetForkChoiceResponseResponse {
     pub justified_checkpoint: AltairBeaconStateCurrentJustifiedCheckpoint,
 }
 ///fork choice node attributes
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetForkChoiceResponseResponseForkChoiceNode {
     ///The signing merkle root of the `BeaconBlock`.
     pub block_root: String,
@@ -2922,7 +2922,7 @@ pub enum GetForkScheduleResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetForkScheduleResponseResponse {
     pub data: Vec<BeaconStateFork>,
 }
@@ -2972,11 +2972,11 @@ pub enum GetGenesisResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetGenesisResponseResponse {
     pub data: GetGenesisResponseResponseData,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetGenesisResponseResponseData {
     ///a fork version number
     pub genesis_fork_version: String,
@@ -3169,12 +3169,12 @@ pub enum GetLightClientBootstrapResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetLightClientBootstrapResponseResponse {
     pub data: GetLightClientBootstrapResponseResponseData,
     pub version: ConsensusVersion,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 #[serde(untagged)]
 pub enum GetLightClientBootstrapResponseResponseData {
     #[default]
@@ -3183,25 +3183,25 @@ pub enum GetLightClientBootstrapResponseResponseData {
     Object3(GetLightClientBootstrapResponseResponseDataObject3),
     Object4(GetLightClientBootstrapResponseResponseDataObject4),
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetLightClientBootstrapResponseResponseDataObject {
     pub current_sync_committee: AltairBeaconStateCurrentSyncCommittee,
     pub current_sync_committee_branch: Vec<String>,
     pub header: Header2,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetLightClientBootstrapResponseResponseDataObject2 {
     pub current_sync_committee: AltairBeaconStateCurrentSyncCommittee,
     pub current_sync_committee_branch: Vec<String>,
     pub header: Header2,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetLightClientBootstrapResponseResponseDataObject3 {
     pub current_sync_committee: AltairBeaconStateCurrentSyncCommittee,
     pub current_sync_committee_branch: Vec<String>,
     pub header: Header,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetLightClientBootstrapResponseResponseDataObject4 {
     pub current_sync_committee: AltairBeaconStateCurrentSyncCommittee,
     pub current_sync_committee_branch: Vec<String>,
@@ -3282,12 +3282,12 @@ pub enum GetLightClientFinalityUpdateResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetLightClientFinalityUpdateResponseResponse {
     pub data: GetLightClientFinalityUpdateResponseResponseData,
     pub version: ConsensusVersion,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 #[serde(untagged)]
 pub enum GetLightClientFinalityUpdateResponseResponseData {
     #[default]
@@ -3296,7 +3296,7 @@ pub enum GetLightClientFinalityUpdateResponseResponseData {
     Object3(GetLightClientFinalityUpdateResponseResponseDataObject3),
     Object4(GetLightClientFinalityUpdateResponseResponseDataObject4),
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetLightClientFinalityUpdateResponseResponseDataObject {
     pub attested_header: Header2,
     pub finality_branch: Vec<String>,
@@ -3305,7 +3305,7 @@ pub struct GetLightClientFinalityUpdateResponseResponseDataObject {
     ///The [`SyncAggregate`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/altair/beacon-chain.md#syncaggregate) object from the CL Altair spec.
     pub sync_aggregate: SyncAggregate,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetLightClientFinalityUpdateResponseResponseDataObject2 {
     pub attested_header: Header2,
     pub finality_branch: Vec<String>,
@@ -3314,7 +3314,7 @@ pub struct GetLightClientFinalityUpdateResponseResponseDataObject2 {
     ///The [`SyncAggregate`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/altair/beacon-chain.md#syncaggregate) object from the CL Altair spec.
     pub sync_aggregate: SyncAggregate,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetLightClientFinalityUpdateResponseResponseDataObject3 {
     pub attested_header: Header,
     pub finality_branch: Vec<String>,
@@ -3323,7 +3323,7 @@ pub struct GetLightClientFinalityUpdateResponseResponseDataObject3 {
     ///The [`SyncAggregate`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/altair/beacon-chain.md#syncaggregate) object from the CL Altair spec.
     pub sync_aggregate: SyncAggregate,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetLightClientFinalityUpdateResponseResponseDataObject4 {
     pub attested_header: Header3,
     pub finality_branch: Vec<String>,
@@ -3407,12 +3407,12 @@ pub enum GetLightClientOptimisticUpdateResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetLightClientOptimisticUpdateResponseResponse {
     pub data: GetLightClientOptimisticUpdateResponseResponseData,
     pub version: ConsensusVersion,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 #[serde(untagged)]
 pub enum GetLightClientOptimisticUpdateResponseResponseData {
     #[default]
@@ -3421,21 +3421,21 @@ pub enum GetLightClientOptimisticUpdateResponseResponseData {
     Object3(GetLightClientOptimisticUpdateResponseResponseDataObject3),
     Object4(GetLightClientOptimisticUpdateResponseResponseDataObject4),
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetLightClientOptimisticUpdateResponseResponseDataObject {
     pub attested_header: Header2,
     pub signature_slot: String,
     ///The [`SyncAggregate`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/altair/beacon-chain.md#syncaggregate) object from the CL Altair spec.
     pub sync_aggregate: SyncAggregate,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetLightClientOptimisticUpdateResponseResponseDataObject3 {
     pub attested_header: Header,
     pub signature_slot: String,
     ///The [`SyncAggregate`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/altair/beacon-chain.md#syncaggregate) object from the CL Altair spec.
     pub sync_aggregate: SyncAggregate,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetLightClientOptimisticUpdateResponseResponseDataObject4 {
     pub attested_header: Header3,
     pub signature_slot: String,
@@ -3668,11 +3668,11 @@ pub enum GetNetworkIdentityResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetNetworkIdentityResponseResponse {
     pub data: GetNetworkIdentityResponseResponseData,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetNetworkIdentityResponseResponseData {
     pub discovery_addresses: Vec<String>,
     ///Ethereum node record. [Read more](https://eips.ethereum.org/EIPS/eip-778)
@@ -3757,11 +3757,11 @@ pub enum GetPeerCountResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetPeerCountResponseResponse {
     pub data: GetPeerCountResponseResponseData,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetPeerCountResponseResponseData {
     pub connected: String,
     pub connecting: String,
@@ -3843,7 +3843,7 @@ pub enum GetPeerResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetPeerResponseResponse {
     pub data: GetPeersResponseResponseDatum,
 }
@@ -3910,12 +3910,12 @@ pub enum GetPeersResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetPeersResponseResponse {
     pub data: Vec<GetPeersResponseResponseDatum>,
     pub meta: GetPeersResponseResponseMeta,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetPeersResponseResponseDatum {
     pub direction: PeerConnectionDirection,
     pub enr: Option<String>,
@@ -3925,7 +3925,7 @@ pub struct GetPeersResponseResponseDatum {
     pub peer_id: String,
     pub state: PeerConnectionState,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetPeersResponseResponseMeta {
     ///Total number of items
     pub count: f64,
@@ -4142,7 +4142,7 @@ pub enum GetPendingDepositsResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetPendingDepositsResponseResponse {
     pub data: Vec<GetPendingDepositsResponseResponseDatum>,
     ///True if the response references an unverified execution payload. Optimistic information may be invalidated at a later time. If the field is not present, assume the False value.
@@ -4151,7 +4151,7 @@ pub struct GetPendingDepositsResponseResponse {
     pub finalized: bool,
     pub version: ConsensusVersion,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetPendingDepositsResponseResponse2 {
     pub data: Vec<GetPendingDepositsResponseResponse2Datum>,
     ///True if the response references an unverified execution payload. Optimistic information may be invalidated at a later time. If the field is not present, assume the False value.
@@ -4161,7 +4161,7 @@ pub struct GetPendingDepositsResponseResponse2 {
     pub version: ConsensusVersion,
 }
 ///The [`PendingDeposit`](https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/electra/beacon-chain.md#pendingdeposit) object from the CL Electra spec.
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetPendingDepositsResponseResponse2Datum {
     ///The value to be deposited (gwei).
     pub amount: String,
@@ -4174,7 +4174,7 @@ pub struct GetPendingDepositsResponseResponse2Datum {
     pub withdrawal_credentials: String,
 }
 ///The [`PendingConsolidation`](https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/electra/beacon-chain.md#pendingconsolidation) object from the CL Electra spec.
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetPendingDepositsResponseResponseDatum {
     ///Index of validator to consolidate from.
     pub source_index: String,
@@ -4287,7 +4287,7 @@ pub enum GetPendingPartialWithdrawalsResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetPendingPartialWithdrawalsResponseResponse {
     pub data: Vec<GetPendingPartialWithdrawalsResponseResponseDatum>,
     ///True if the response references an unverified execution payload. Optimistic information may be invalidated at a later time. If the field is not present, assume the False value.
@@ -4297,7 +4297,7 @@ pub struct GetPendingPartialWithdrawalsResponseResponse {
     pub version: ConsensusVersion,
 }
 ///The [`PendingPartialWithdrawal`](https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/electra/beacon-chain.md#pendingpartialwithdrawal) object from the CL Electra spec.
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetPendingPartialWithdrawalsResponseResponseDatum {
     ///The value to be withdrawn (gwei).
     pub amount: String,
@@ -4378,7 +4378,7 @@ pub enum GetPoolAttestationsV2Response {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetPoolAttestationsV2ResponseResponse {
     pub data: GetBlockAttestationsV2ResponseResponseData,
     pub version: ConsensusVersion,
@@ -4420,12 +4420,12 @@ pub enum GetPoolAttesterSlashingsV2Response {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetPoolAttesterSlashingsV2ResponseResponse {
     pub data: GetPoolAttesterSlashingsV2ResponseResponseData,
     pub version: ConsensusVersion,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 #[serde(untagged)]
 pub enum GetPoolAttesterSlashingsV2ResponseResponseData {
     #[default]
@@ -4468,7 +4468,7 @@ pub struct GetPoolAttesterSlashingsV2ResponseResponseDataArray2 {
     #[validate(nested)]
     pub attestation_2: Phase0AttesterSlashingAttestation1,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetPoolBLSToExecutionChangesResponseResponse {
     pub data: Vec<GetPoolBLSToExecutionChangesResponseResponseDatum>,
 }
@@ -4566,7 +4566,7 @@ pub enum GetPoolProposerSlashingsResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetPoolProposerSlashingsResponseResponse {
     pub data: Vec<GetPoolProposerSlashingsResponseResponseDatum>,
 }
@@ -4625,7 +4625,7 @@ pub enum GetPoolVoluntaryExitsResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetPoolVoluntaryExitsResponseResponse {
     pub data: Vec<GetPoolVoluntaryExitsResponseResponseDatum>,
 }
@@ -4731,7 +4731,7 @@ pub enum GetProposerDutiesResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetProposerDutiesResponseResponse {
     pub data: Vec<GetProposerDutiesResponseResponseDatum>,
     ///The block root that this response is dependent on.
@@ -4739,7 +4739,7 @@ pub struct GetProposerDutiesResponseResponse {
     ///True if the response references an unverified execution payload. Optimistic information may be invalidated at a later time. If the field is not present, assume the False value.
     pub execution_optimistic: bool,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetProposerDutiesResponseResponseDatum {
     ///The validator's BLS public key, uniquely identifying them. _48-bytes, hex encoded with 0x prefix, case insensitive._
     pub pubkey: String,
@@ -4854,7 +4854,7 @@ pub enum GetProposerLookaheadResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetProposerLookaheadResponseResponse {
     pub data: Vec<String>,
     ///True if the response references an unverified execution payload. Optimistic information may be invalidated at a later time. If the field is not present, assume the False value.
@@ -4908,7 +4908,7 @@ pub enum GetSpecResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetSpecResponseResponse {
     ///Key value mapping of all constants, presets and configuration values for all known hard forks
     ///Values are returned with following format:
@@ -4997,7 +4997,7 @@ pub enum GetStateFinalityCheckpointsResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetStateFinalityCheckpointsResponseResponse {
     pub data: GetStateFinalityCheckpointsResponseResponseData,
     ///True if the response references an unverified execution payload. Optimistic information may be invalidated at a later time. If the field is not present, assume the False value.
@@ -5005,7 +5005,7 @@ pub struct GetStateFinalityCheckpointsResponseResponse {
     ///True if the response references the finalized history of the chain, as determined by fork choice. If the field is not present, additional calls are necessary to compare the epoch of the requested information with the finalized checkpoint.
     pub finalized: bool,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetStateFinalityCheckpointsResponseResponseData {
     ///The [`Checkpoint`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/phase0/beacon-chain.md#checkpoint) object from the CL spec.
     pub current_justified: AltairBeaconStateCurrentJustifiedCheckpoint,
@@ -5094,7 +5094,7 @@ pub enum GetStateForkResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetStateForkResponseResponse {
     ///The [`Fork`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/phase0/beacon-chain.md#fork) object from the CL spec.
     pub data: BeaconStateFork,
@@ -5199,7 +5199,7 @@ pub enum GetStateRandaoResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetStateRandaoResponseResponse {
     pub data: GetStateRandaoResponseResponseData,
     ///True if the response references an unverified execution payload. Optimistic information may be invalidated at a later time. If the field is not present, assume the False value.
@@ -5207,7 +5207,7 @@ pub struct GetStateRandaoResponseResponse {
     ///True if the response references the finalized history of the chain, as determined by fork choice. If the field is not present, additional calls are necessary to compare the epoch of the requested information with the finalized checkpoint.
     pub finalized: bool,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetStateRandaoResponseResponseData {
     ///RANDAO mix for requested epoch in state.
     pub randao: String,
@@ -5292,7 +5292,7 @@ pub enum GetStateRootResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetStateRootResponseResponse {
     pub data: GetStateRootResponseResponseData,
     ///True if the response references an unverified execution payload. Optimistic information may be invalidated at a later time. If the field is not present, assume the False value.
@@ -5300,7 +5300,7 @@ pub struct GetStateRootResponseResponse {
     ///True if the response references the finalized history of the chain, as determined by fork choice. If the field is not present, additional calls are necessary to compare the epoch of the requested information with the finalized checkpoint.
     pub finalized: bool,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetStateRootResponseResponseData {
     ///HashTreeRoot of BeaconState object
     pub root: String,
@@ -5410,7 +5410,7 @@ pub enum GetStateV2Response {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetStateV2ResponseResponse {
     pub data: GetStateV2ResponseResponseData,
     ///True if the response references an unverified execution payload. Optimistic information may be invalidated at a later time. If the field is not present, assume the False value.
@@ -5419,7 +5419,7 @@ pub struct GetStateV2ResponseResponse {
     pub finalized: bool,
     pub version: ConsensusVersion,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 #[serde(untagged)]
 pub enum GetStateV2ResponseResponseData {
     ///The [`BeaconState`](https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/electra/beacon-chain.md#beaconstate) object from the CL Electra spec.
@@ -5437,7 +5437,7 @@ pub enum GetStateV2ResponseResponseData {
     Object6(GetStateV2ResponseResponseDataObject6),
 }
 ///The [`BeaconState`](https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/electra/beacon-chain.md#beaconstate) object from the CL Electra spec.
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetStateV2ResponseResponseDataObject {
     ///Validator balances in gwei. Variable length list, maximum 1099511627776 items
     pub balances: Vec<String>,
@@ -5498,7 +5498,7 @@ pub struct GetStateV2ResponseResponseDataObject {
     pub validators: Vec<ValidatorResponseValidator>,
 }
 ///The [`BeaconState`](https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/deneb/beacon-chain.md#beaconstate) object from the Eth2.0 Deneb spec.
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetStateV2ResponseResponseDataObject2 {
     ///Validator balances in gwei. Variable length list, maximum 1099511627776 items
     pub balances: Vec<String>,
@@ -5548,7 +5548,7 @@ pub struct GetStateV2ResponseResponseDataObject2 {
     pub validators: Vec<ValidatorResponseValidator>,
 }
 ///The [`BeaconState`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/capella/beacon-chain.md#beaconstate) object from the Eth2.0 Capella spec.
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetStateV2ResponseResponseDataObject3 {
     ///Validator balances in gwei. Variable length list, maximum 1099511627776 items
     pub balances: Vec<String>,
@@ -5598,7 +5598,7 @@ pub struct GetStateV2ResponseResponseDataObject3 {
     pub validators: Vec<ValidatorResponseValidator>,
 }
 ///The [`BeaconState`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/bellatrix/beacon-chain.md#beaconstate) object from the Eth2.0 Bellatrix spec.
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetStateV2ResponseResponseDataObject4 {
     ///Validator balances in Gwei. Variable length list, maximum 1099511627776 items
     pub balances: Vec<String>,
@@ -5644,7 +5644,7 @@ pub struct GetStateV2ResponseResponseDataObject4 {
     pub validators: Vec<ValidatorResponseValidator>,
 }
 ///The [`BeaconState`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/altair/beacon-chain.md#beaconstate) object from the CL Altair spec.
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetStateV2ResponseResponseDataObject5 {
     ///Validator balances in gwei. Variable length list, maximum 1099511627776 items
     pub balances: Vec<String>,
@@ -5688,7 +5688,7 @@ pub struct GetStateV2ResponseResponseDataObject5 {
     pub validators: Vec<ValidatorResponseValidator>,
 }
 ///The [`BeaconState`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/phase0/beacon-chain.md#beacon-state) object from the CL spec.
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetStateV2ResponseResponseDataObject6 {
     ///Validator balances in gwei. Variable length list, maximum 1099511627776 items
     pub balances: Vec<String>,
@@ -5732,7 +5732,7 @@ pub struct GetStateV2ResponseResponseDataObject6 {
     pub validators: Vec<ValidatorResponseValidator>,
 }
 ///The [`PendingAttestation`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/phase0/beacon-chain.md#pendingattestation) object from the CL spec.
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetStateV2ResponseResponseDataObject6CurrentEpochAttestation {
     ///Attester aggregation bits.
     pub aggregation_bits: String,
@@ -5742,7 +5742,7 @@ pub struct GetStateV2ResponseResponseDataObject6CurrentEpochAttestation {
     pub proposer_index: String,
 }
 ///The [`HistoricalSummary`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/capella/beacon-chain.md#historicalsummary) object from the CL Capella spec.
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetStateV2ResponseResponseDataObjectHistoricalSummary {
     pub block_summary_root: String,
     pub state_summary_root: String,
@@ -5860,7 +5860,7 @@ pub enum GetStateValidatorBalancesResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetStateValidatorBalancesResponseResponse {
     pub data: Vec<GetStateValidatorBalancesResponseResponseDatum>,
     ///True if the response references an unverified execution payload. Optimistic information may be invalidated at a later time. If the field is not present, assume the False value.
@@ -5868,7 +5868,7 @@ pub struct GetStateValidatorBalancesResponseResponse {
     ///True if the response references the finalized history of the chain, as determined by fork choice. If the field is not present, additional calls are necessary to compare the epoch of the requested information with the finalized checkpoint.
     pub finalized: bool,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetStateValidatorBalancesResponseResponseDatum {
     ///Current validator balance in gwei.
     pub balance: String,
@@ -5959,7 +5959,7 @@ pub enum GetStateValidatorResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetStateValidatorResponseResponse {
     pub data: GetStateValidatorsResponseResponseDatum,
     ///True if the response references an unverified execution payload. Optimistic information may be invalidated at a later time. If the field is not present, assume the False value.
@@ -6087,7 +6087,7 @@ pub enum GetStateValidatorsResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetStateValidatorsResponseResponse {
     pub data: Vec<GetStateValidatorsResponseResponseDatum>,
     ///True if the response references an unverified execution payload. Optimistic information may be invalidated at a later time. If the field is not present, assume the False value.
@@ -6095,7 +6095,7 @@ pub struct GetStateValidatorsResponseResponse {
     ///True if the response references the finalized history of the chain, as determined by fork choice. If the field is not present, additional calls are necessary to compare the epoch of the requested information with the finalized checkpoint.
     pub finalized: bool,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetStateValidatorsResponseResponseDatum {
     ///Current validator balance in gwei.
     pub balance: String,
@@ -6202,13 +6202,13 @@ pub enum GetSyncCommitteeDutiesResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetSyncCommitteeDutiesResponseResponse {
     pub data: Vec<GetSyncCommitteeDutiesResponseResponseDatum>,
     ///True if the response references an unverified execution payload. Optimistic information may be invalidated at a later time. If the field is not present, assume the False value.
     pub execution_optimistic: bool,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetSyncCommitteeDutiesResponseResponseDatum {
     ///The validator's BLS public key, uniquely identifying them. _48-bytes, hex encoded with 0x prefix, case insensitive._
     pub pubkey: String,
@@ -6303,7 +6303,7 @@ pub enum GetSyncCommitteeRewardsResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetSyncCommitteeRewardsResponseResponse {
     ///Rewards info for sync committee members
     pub data: Vec<GetSyncCommitteeRewardsResponseResponseDatum>,
@@ -6313,7 +6313,7 @@ pub struct GetSyncCommitteeRewardsResponseResponse {
     pub finalized: bool,
 }
 ///Rewards info for a single sync committee member
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetSyncCommitteeRewardsResponseResponseDatum {
     ///sync committee reward in gwei for the validator
     pub reward: String,
@@ -6357,11 +6357,11 @@ pub enum GetSyncingStatusResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetSyncingStatusResponseResponse {
     pub data: GetSyncingStatusResponseResponseData,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetSyncingStatusResponseResponseData {
     ///Set to true if the execution client is offline.
     pub el_offline: bool,
@@ -6374,16 +6374,16 @@ pub struct GetSyncingStatusResponseResponseData {
     ///How many slots node needs to process to reach head. 0 if synced.
     pub sync_distance: String,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetVersionResponseResponse {
     pub data: GetVersionResponseResponseData,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct GetVersionResponseResponseData {
     ///A string which uniquely identifies the client implementation and its version; similar to [HTTP User-Agent](https://tools.ietf.org/html/rfc7231#section-5.5.3).
     pub version: String,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct Header {
     ///The [`BeaconBlockHeader`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/phase0/beacon-chain.md#beaconblockheader) object from the CL spec.
     pub beacon: serde_json::Value,
@@ -6391,7 +6391,7 @@ pub struct Header {
     pub execution: serde_json::Value,
     pub execution_branch: Vec<String>,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct Header2 {
     ///The [`BeaconBlockHeader`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/phase0/beacon-chain.md#beaconblockheader) object from the CL spec.
     pub beacon: serde_json::Value,
@@ -6399,13 +6399,13 @@ pub struct Header2 {
     pub execution: serde_json::Value,
     pub execution_branch: Vec<String>,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct Header3 {
     ///The [`BeaconBlockHeader`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/phase0/beacon-chain.md#beaconblockheader) object from the CL spec.
     pub beacon: serde_json::Value,
 }
 ///Based on eth2 [Metadata object](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/phase0/p2p-interface.md#metadata)
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct NetworkIdentityMetadata {
     ///Bitvector representing the node's persistent attestation subnet subscriptions.
     pub attnets: String,
@@ -6416,7 +6416,7 @@ pub struct NetworkIdentityMetadata {
     ///Bitvector representing the node's sync committee subnet subscriptions. This metadata is not present in phase0, but will be present in Altair.
     pub syncnets: Option<String>,
 }
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, oas3_gen_support::Default)]
 pub enum NodeValidity {
     #[serde(rename = "valid")]
     #[default]
@@ -6491,7 +6491,7 @@ impl core::fmt::Display for PeerConnectionState {
         }
     }
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct PendingConsolidation400Response {
     ///Either specific error code in case of invalid request or http status code
     pub code: f64,
@@ -6525,7 +6525,7 @@ pub struct Phase0AttesterSlashingAttestation1 {
     pub signature: String,
 }
 ///The [`BeaconBlockBody`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/phase0/beacon-chain.md#beaconblockbody) object from the CL spec.
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct Phase0BeaconBlockBody {
     pub attestations: Vec<GetBlockAttestationsV2ResponseResponseDataArray2>,
     pub attester_slashings: Vec<GetPoolAttesterSlashingsV2ResponseResponseDataArray2>,
@@ -6576,11 +6576,11 @@ pub struct Phase0SignedVoluntaryExitMessage {
     pub validator_index: String,
 }
 pub type PostLivenessRequestBodyRequestBody = Vec<String>;
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct PostLivenessResponseBodyResponse {
     pub data: Vec<PostLivenessResponseBodyResponseDatum>,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct PostLivenessResponseBodyResponseDatum {
     pub index: String,
     pub is_live: bool,
@@ -6798,7 +6798,7 @@ pub enum PostStateValidatorIdentitiesResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct PostStateValidatorIdentitiesResponseResponse {
     pub data: Vec<PostStateValidatorIdentitiesResponseResponseDatum>,
     ///True if the response references an unverified execution payload. Optimistic information may be invalidated at a later time. If the field is not present, assume the False value.
@@ -6806,7 +6806,7 @@ pub struct PostStateValidatorIdentitiesResponseResponse {
     ///True if the response references the finalized history of the chain, as determined by fork choice. If the field is not present, additional calls are necessary to compare the epoch of the requested information with the finalized checkpoint.
     pub finalized: bool,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct PostStateValidatorIdentitiesResponseResponseDatum {
     ///Epoch when validator activated. 'FAR_FUTURE_EPOCH' if not activated
     pub activation_epoch: String,
@@ -7239,7 +7239,7 @@ pub enum ProduceAttestationDataResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct ProduceAttestationDataResponseResponse {
     ///The [`AttestationData`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/phase0/beacon-chain.md#attestationdata) object from the CL spec.
     pub data: Data,
@@ -7422,7 +7422,7 @@ pub enum ProduceBlockV3Response {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct ProduceBlockV3ResponseResponse {
     pub consensus_block_value: String,
     pub data: ProduceBlockV3ResponseResponseData,
@@ -7430,7 +7430,7 @@ pub struct ProduceBlockV3ResponseResponse {
     pub execution_payload_value: String,
     pub version: ConsensusVersion,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 #[serde(untagged)]
 pub enum ProduceBlockV3ResponseResponseData {
     ///The required object for block production according to the Fulu CL spec.
@@ -7458,7 +7458,7 @@ pub enum ProduceBlockV3ResponseResponseData {
     Variant10(ProduceBlockV3ResponseResponseDataVariant10),
 }
 ///The required object for block production according to the Fulu CL spec.
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct ProduceBlockV3ResponseResponseDataObject {
     pub blobs: Vec<String>,
     ///The [`BeaconBlock`](https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/phase0/beacon-chain.md#beaconblock) object from the CL Electra spec.
@@ -7467,7 +7467,7 @@ pub struct ProduceBlockV3ResponseResponseDataObject {
     pub kzg_proofs: Vec<String>,
 }
 ///The required object for block production according to the Electra CL spec.
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct ProduceBlockV3ResponseResponseDataObject2 {
     pub blobs: Vec<String>,
     ///The [`BeaconBlock`](https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/phase0/beacon-chain.md#beaconblock) object from the CL Electra spec.
@@ -7475,7 +7475,7 @@ pub struct ProduceBlockV3ResponseResponseDataObject2 {
     pub kzg_proofs: Vec<String>,
 }
 ///The required object for block production according to the Deneb CL spec.
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct ProduceBlockV3ResponseResponseDataObject3 {
     pub blobs: Vec<String>,
     ///The [`BeaconBlock`](https://github.com/ethereum/consensus-specs/blob/v1.4.0/specs/phase0/beacon-chain.md#beaconblock) object from the CL Deneb spec.
@@ -7483,7 +7483,7 @@ pub struct ProduceBlockV3ResponseResponseDataObject3 {
     pub kzg_proofs: Vec<String>,
 }
 ///The [`BeaconBlock`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/phase0/beacon-chain.md#beaconblock) object from the CL spec.
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct ProduceBlockV3ResponseResponseDataVariant10 {
     ///The [`BeaconBlockBody`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/phase0/beacon-chain.md#beaconblockbody) object from the CL spec.
     pub body: Phase0BeaconBlockBody,
@@ -7497,7 +7497,7 @@ pub struct ProduceBlockV3ResponseResponseDataVariant10 {
     pub state_root: String,
 }
 ///A variant of the [`BeaconBlock`](https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/phase0/beacon-chain.md#beaconblock) object from the CL Electra spec, which contains a `BlindedBeaconBlockBody` rather than a `BeaconBlockBody`.
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct ProduceBlockV3ResponseResponseDataVariant2 {
     ///A variant of the [`BeaconBlockBody`](https://github.com/ethereum/consensus-specs/blob/v1.5.0/specs/electra/beacon-chain.md#beaconblockbody) object from the CL Electra spec, which contains a transactions root rather than a full transactions list.
     pub body: serde_json::Value,
@@ -7511,7 +7511,7 @@ pub struct ProduceBlockV3ResponseResponseDataVariant2 {
     pub state_root: String,
 }
 ///A variant of the [`BeaconBlock`](https://github.com/ethereum/consensus-specs/blob/v1.4.0/specs/phase0/beacon-chain.md#beaconblock) object from the CL Deneb spec, which contains a `BlindedBeaconBlockBody` rather than a `BeaconBlockBody`.
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct ProduceBlockV3ResponseResponseDataVariant4 {
     ///A variant of the [`BeaconBlockBody`](https://github.com/ethereum/consensus-specs/blob/v1.4.0/specs/deneb/beacon-chain.md#beaconblockbody) object from the CL Deneb spec, which contains a transactions root rather than a full transactions list.
     pub body: serde_json::Value,
@@ -7525,7 +7525,7 @@ pub struct ProduceBlockV3ResponseResponseDataVariant4 {
     pub state_root: String,
 }
 ///The [`BeaconBlock`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/phase0/beacon-chain.md#beaconblock) object from the CL Capella spec.
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct ProduceBlockV3ResponseResponseDataVariant5 {
     pub body: serde_json::Value,
     ///The signing Merkle root of the parent `BeaconBlock`.
@@ -7538,7 +7538,7 @@ pub struct ProduceBlockV3ResponseResponseDataVariant5 {
     pub state_root: String,
 }
 ///A variant of the [`BeaconBlock`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/phase0/beacon-chain.md#beaconblock) object from the CL Capella spec, which contains a `BlindedBeaconBlockBody` rather than a `BeaconBlockBody`.
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct ProduceBlockV3ResponseResponseDataVariant6 {
     ///A variant of the [`BeaconBlockBody`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/capella/beacon-chain.md#beaconblockbody) object from the CL Capella spec, which contains a transactions root rather than a full transactions list.
     pub body: serde_json::Value,
@@ -7552,7 +7552,7 @@ pub struct ProduceBlockV3ResponseResponseDataVariant6 {
     pub state_root: String,
 }
 ///The [`BeaconBlock`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/phase0/beacon-chain.md#beaconblock) object from the CL Bellatrix spec.
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct ProduceBlockV3ResponseResponseDataVariant7 {
     pub body: serde_json::Value,
     ///The signing Merkle root of the parent `BeaconBlock`.
@@ -7565,7 +7565,7 @@ pub struct ProduceBlockV3ResponseResponseDataVariant7 {
     pub state_root: String,
 }
 ///A variant of the [`BeaconBlock`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/phase0/beacon-chain.md#beaconblock) object from the CL Bellatrix spec, which contains a `BlindedBeaconBlockBody` rather than a `BeaconBlockBody`.
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct ProduceBlockV3ResponseResponseDataVariant8 {
     ///A variant of the [`BeaconBlockBody`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/bellatrix/beacon-chain.md#beaconblockbody) object from the CL Bellatrix spec, which contains a transactions root rather than a full transactions list.
     pub body: serde_json::Value,
@@ -7579,7 +7579,7 @@ pub struct ProduceBlockV3ResponseResponseDataVariant8 {
     pub state_root: String,
 }
 ///The [`BeaconBlock`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/phase0/beacon-chain.md#beaconblock) object from the CL Altair spec.
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct ProduceBlockV3ResponseResponseDataVariant9 {
     ///The [`BeaconBlockBody`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/altair/beacon-chain.md#beaconblockbody) object from the CL Altair spec.
     pub body: AltairBeaconBlockBody,
@@ -7712,7 +7712,7 @@ pub enum ProduceSyncCommitteeContributionResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct ProduceSyncCommitteeContributionResponseResponse {
     pub data: Contribution,
 }
@@ -8137,7 +8137,7 @@ pub enum PublishContributionAndProofsResponse {
     ///default: Unknown response
     Unknown,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct RegisterValidator415Response {
     ///The media type in "Content-Type" header is unsupported, and the request has been rejected. This occurs when a HTTP request supplies a payload in a content-type that the server is not able to handle.
     pub code: f64,
@@ -8886,7 +8886,7 @@ pub struct SubscribeToBeaconCommitteeSubnetRequestBodyRequestBodyItem {
     pub validator_index: String,
 }
 ///The [`SyncAggregate`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/altair/beacon-chain.md#syncaggregate) object from the CL Altair spec.
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct SyncAggregate {
     ///Aggregation bits of sync
     pub sync_committee_bits: String,
@@ -8946,7 +8946,7 @@ pub struct SyncCommitteeSelectionRequestRequestBodyItem {
     #[validate(length(min = 1u64))]
     pub validator_index: String,
 }
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct SyncCommitteeSelectionResponseResponse {
     pub data: Vec<SyncCommitteeSelectionRequestRequestBodyItem>,
 }
@@ -8982,7 +8982,7 @@ pub struct ValidatorRequestBody {
     pub statuses: Option<Vec<StatusKind>>,
 }
 ///The [`Validator`](https://github.com/ethereum/consensus-specs/blob/v1.3.0/specs/phase0/beacon-chain.md#validator) object from the CL spec.
-#[derive(Debug, Clone, PartialEq, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, oas3_gen_support::Default)]
 pub struct ValidatorResponseValidator {
     ///When criteria for activation were met.
     pub activation_eligibility_epoch: String,
@@ -9013,7 +9013,7 @@ pub struct ValidatorResponseValidator {
 ///- **withdrawal_done** - (not possible in phase0, except slashing full balance) - actually having moved funds away
 ///
 ///[Validator status specification](https://hackmd.io/ofFJ5gOmQpu1jjHilHbdQQ)
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize, oas3_gen_support::Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, oas3_gen_support::Default)]
 pub enum ValidatorStatus {
     #[serde(rename = "pending_initialized")]
     #[default]
