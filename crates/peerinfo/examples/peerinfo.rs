@@ -267,7 +267,7 @@ async fn main() -> anyhow::Result<()> {
         &args.nickname,
     );
 
-    let Node { mut swarm } = Node::new(
+    let Node { mut swarm, .. } = Node::new(
         P2PConfig::default(),
         key,
         false,

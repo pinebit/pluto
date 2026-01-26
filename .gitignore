@@ -19,3 +19,5 @@ target/
 lcov.info
 
 .charon*
+
+.claude/
