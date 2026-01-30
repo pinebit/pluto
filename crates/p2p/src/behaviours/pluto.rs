@@ -4,11 +4,13 @@ use std::sync::LazyLock;
 
 use libp2p::{identify, identity::Keypair, ping, relay, swarm::NetworkBehaviour};
 
-use crate::{config::default_ping_config, gater::ConnGater};
+use crate::{config::default_ping_config, gater::ConnGater, peerstore::PeerStore};
 
 /// Pluto network behaviour.
 #[derive(NetworkBehaviour)]
 pub struct PlutoBehaviour {
+    /// Peer store.
+    pub peerstore: PeerStore,
     /// Connection gater behaviour.
     pub gater: ConnGater,
     /// Relay client behaviour.
@@ -84,8 +86,10 @@ impl PlutoBehaviourBuilder {
     /// Builds the [`PlutoBehaviour`] with the provided keypair and relay
     /// client.
     pub fn build(self, key: &Keypair, relay_client: relay::client::Behaviour) -> PlutoBehaviour {
+        let peerstore = PeerStore::new();
         PlutoBehaviour {
-            gater: self.gater.unwrap_or_else(ConnGater::new_open_gater),
+            peerstore: peerstore.clone(),
+            gater: self.gater.unwrap_or_else(|| ConnGater::new_open_gater(peerstore.clone())),
             relay: relay_client,
             identify: identify::Behaviour::new(
                 identify::Config::new(self.identify_protocol, key.public())

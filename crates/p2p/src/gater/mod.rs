@@ -21,9 +21,9 @@ use libp2p::{
     },
 };
 
-use crate::peer::MutablePeer;
+use crate::{peer::MutablePeer, peerstore::PeerStore};
 
-mod handler;
+pub mod handler;
 
 /// Configuration for the connection gater.
 #[derive(Debug, Clone, Default)]
@@ -68,18 +68,20 @@ impl Config {
 }
 
 /// ConnGater filters incoming and outgoing connections by the cluster peers.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct ConnGater {
     config: Config,
     events: VecDeque<Event>,
+    peerstore: PeerStore,
 }
 
 impl ConnGater {
     /// Creates a new connection gater with the given configuration.
-    pub fn new(config: Config) -> Self {
+    pub fn new(config: Config, peerstore: PeerStore) -> Self {
         Self {
             config,
             events: VecDeque::new(),
+            peerstore,
         }
     }
 
@@ -89,14 +91,16 @@ impl ConnGater {
         Self {
             config: Config::closed().with_peer_ids(peers).with_relays(relays),
             events: VecDeque::new(),
+            peerstore: PeerStore::new(),
         }
     }
 
     /// Creates a new open gater that does not gate any connections.
-    pub fn new_open_gater() -> Self {
+    pub fn new_open_gater(peerstore: PeerStore) -> Self {
         Self {
             config: Config::open(),
             events: VecDeque::new(),
+            peerstore,
         }
     }
 
@@ -169,6 +173,7 @@ impl NetworkBehaviour for ConnGater {
 
     fn on_swarm_event(&mut self, _event: FromSwarm) {
         // No special handling needed for swarm events
+        tracing::info!(active_peers = ?self.peerstore.peers::<Vec<_>>(), "Active peers");
     }
 
     fn on_connection_handler_event(

@@ -20,10 +20,7 @@ use libp2p::{
 use pluto_cluster::lock::Lock;
 use pluto_core::version::{VERSION, git_commit};
 use pluto_p2p::{
-    config::P2PConfig,
-    k1,
-    name::peer_name,
-    p2p::{Node, NodeType},
+    config::P2PConfig, gater::ConnGater, k1, name::peer_name, p2p::{Node, NodeType}, peerstore::PeerStore
 };
 use pluto_peerinfo::{Behaviour, Config, Event, LocalPeerInfo};
 use pluto_tracing::{LokiConfig, TracingConfig};
@@ -86,6 +83,8 @@ fn parse_key_value(s: &str) -> Result<(String, String), String> {
 /// Combined behaviour with peerinfo, identify, ping, and mdns
 #[derive(NetworkBehaviour)]
 pub struct CombinedBehaviour {
+    pub peerstore: PeerStore,
+    pub gater: ConnGater,
     pub peer_info: Behaviour,
     pub identify: identify::Behaviour,
     pub ping: ping::Behaviour,
@@ -277,12 +276,17 @@ async fn main() -> anyhow::Result<()> {
         &args.nickname,
     );
 
+    let peerstore = PeerStore::new();
+    let gater = ConnGater::new_open_gater(peerstore.clone());
+
     let Node { mut swarm, .. } = Node::new(
         P2PConfig::default(),
         key,
         false,
         NodeType::TCP,
         |key, relay_client| CombinedBehaviour {
+            peerstore: peerstore.clone(),
+            gater: gater.clone(),
             peer_info: Behaviour::new(
                 Config::new(local_info.clone())
                     .with_peers(peers.clone())

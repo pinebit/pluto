@@ -28,3 +28,6 @@ pub mod behaviours;
 
 /// K1 utilities.
 pub mod k1;
+
+/// Peer store.
+pub mod peerstore;

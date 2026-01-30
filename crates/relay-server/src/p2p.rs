@@ -15,7 +15,7 @@ use crate::{
     error::RelayP2PError,
     web::enr_server,
 };
-use pluto_p2p::{gater::ConnGater, p2p::Node};
+use pluto_p2p::{gater::ConnGater, p2p::Node, peerstore::PeerStore};
 
 /// Runs a relay P2P node.
 #[instrument(skip(config, key, ct))]
@@ -26,7 +26,7 @@ pub async fn run_relay_p2p_node(
 ) -> Result<Node<RelayServerBehaviour>> {
     let mut node = Node::new_relay_server(config.p2p_config.clone(), key.clone(), false, |key| {
         RelayServerBehaviour::builder()
-            .with_gater(ConnGater::new_open_gater())
+            .with_gater(ConnGater::new_open_gater(PeerStore::new()))
             .with_relay_config(create_relay_config(config))
             .build(key)
     })?;
