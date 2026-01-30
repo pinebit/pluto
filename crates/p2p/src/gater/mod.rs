@@ -173,7 +173,8 @@ impl NetworkBehaviour for ConnGater {
 
     fn on_swarm_event(&mut self, _event: FromSwarm) {
         // No special handling needed for swarm events
-        tracing::info!(active_peers = ?self.peerstore.peers::<Vec<_>>(), "Active peers");
+        tracing::warn!(active_peers = ?self.peerstore.peers::<Vec<_>>(), "Active peers (with clone)");
+        tracing::warn!(active_peers = ?self.peerstore.peers_lock(), "Active peers (without clone)");
     }
 
     fn on_connection_handler_event(
