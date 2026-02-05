@@ -62,7 +62,10 @@ async fn main() -> Result<()> {
                 .await
                 .ok_or(anyhow::anyhow!("Swarm event is None"))?
             {
-                SwarmEvent::NewListenAddr { .. } | SwarmEvent::Dialing { .. } | SwarmEvent::ConnectionEstablished { .. } | SwarmEvent::Behaviour(PlutoMdnsBehaviourEvent::Pluto(
+                SwarmEvent::NewListenAddr { .. }
+                | SwarmEvent::Dialing { .. }
+                | SwarmEvent::ConnectionEstablished { .. }
+                | SwarmEvent::Behaviour(PlutoMdnsBehaviourEvent::Pluto(
                     PlutoBehaviourEvent::Ping(_),
                 )) => {}
                 SwarmEvent::Behaviour(PlutoMdnsBehaviourEvent::Pluto(

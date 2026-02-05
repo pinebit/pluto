@@ -1283,7 +1283,9 @@ where
 
 /// Construct a function that returns true if the message is from a unique
 /// source.
-fn uniq_source<I, V, C>(vec: Vec<Msg<I, V, C>>) -> impl for<'a> FnMut(&'a std::sync::Arc<(dyn SomeMsg<I, V, C> + 'static)>) -> bool
+fn uniq_source<I, V, C>(
+    vec: Vec<Msg<I, V, C>>,
+) -> impl for<'a> FnMut(&'a std::sync::Arc<(dyn SomeMsg<I, V, C> + 'static)>) -> bool
 where
     V: PartialEq,
 {
