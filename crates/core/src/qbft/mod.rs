@@ -1285,7 +1285,7 @@ where
 /// source.
 fn uniq_source<I, V, C>(
     vec: Vec<Msg<I, V, C>>,
-) -> impl for<'a> FnMut(&'a std::sync::Arc<(dyn SomeMsg<I, V, C> + 'static)>) -> bool
+) -> impl for<'a> FnMut(&'a std::sync::Arc<dyn SomeMsg<I, V, C> + 'static>) -> bool
 where
     V: PartialEq,
 {
