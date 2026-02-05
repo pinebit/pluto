@@ -77,16 +77,33 @@ pub struct P2PConfig {
 
 impl P2PConfig {
     /// Returns the TCP addresses of the node.
+    ///
+    /// # Errors
+    ///
+    /// - [`P2PConfigError::FailedToParseTcpAddresses`] if the TCP addresses
+    ///   cannot be parsed.
+    /// - [`P2PConfigError::UnspecifiedIP`] if the IP address is unspecified.
     pub fn parse_tcp_addrs(&self) -> Result<Vec<SocketAddr>> {
         self.tcp_addrs.iter().map(resolve_listen_tcp_addr).collect()
     }
 
     /// Returns the UDP addresses of the node.
+    ///
+    /// # Errors
+    ///
+    /// - [`P2PConfigError::FailedToParseUdpAddresses`] if the UDP addresses
+    ///   cannot be parsed.
+    /// - [`P2PConfigError::UnspecifiedIP`] if the IP address is unspecified.
     pub fn parse_udp_addrs(&self) -> Result<Vec<SocketAddr>> {
         self.udp_addrs.iter().map(resolve_listen_udp_addr).collect()
     }
 
     /// Returns the UDP multiaddresses of the node.
+    ///
+    /// # Errors
+    ///
+    /// - [`P2PConfigError::FailedToParseUdpAddresses`] if the UDP addresses
+    ///   cannot be parsed.
     pub fn udp_multiaddrs(&self) -> Result<Vec<Multiaddr>> {
         let addrs = self.parse_udp_addrs()?;
 
@@ -94,6 +111,11 @@ impl P2PConfig {
     }
 
     /// Returns the TCP multiaddresses of the node.
+    ///
+    /// # Errors
+    ///
+    /// - [`P2PConfigError::FailedToParseTcpAddresses`] if the TCP addresses
+    ///   cannot be parsed.
     pub fn tcp_multiaddrs(&self) -> Result<Vec<Multiaddr>> {
         let addrs = self.parse_tcp_addrs()?;
 
@@ -101,6 +123,7 @@ impl P2PConfig {
     }
 
     /// Returns a new builder for configuring a P2P configuration.
+    #[must_use]
     pub fn builder() -> P2PConfigBuilder {
         P2PConfigBuilder::new()
     }
@@ -114,6 +137,7 @@ pub struct P2PConfigBuilder {
 
 impl P2PConfigBuilder {
     /// Creates a new builder with default configuration.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             config: P2PConfig::default(),
@@ -121,42 +145,49 @@ impl P2PConfigBuilder {
     }
 
     /// Sets the relay multiaddrs.
+    #[must_use]
     pub fn with_relays(mut self, relays: Vec<Multiaddr>) -> Self {
         self.config.relays = relays;
         self
     }
 
     /// Sets the external IP address.
+    #[must_use]
     pub fn with_external_ip(mut self, external_ip: String) -> Self {
         self.config.external_ip = Some(external_ip);
         self
     }
 
     /// Sets the external host.
+    #[must_use]
     pub fn with_external_host(mut self, external_host: String) -> Self {
         self.config.external_host = Some(external_host);
         self
     }
 
     /// Sets the TCP addresses.
+    #[must_use]
     pub fn with_tcp_addrs(mut self, tcp_addrs: Vec<String>) -> Self {
         self.config.tcp_addrs = tcp_addrs;
         self
     }
 
     /// Sets the UDP addresses.
+    #[must_use]
     pub fn with_udp_addrs(mut self, udp_addrs: Vec<String>) -> Self {
         self.config.udp_addrs = udp_addrs;
         self
     }
 
     /// Sets whether to disable the reuse port.
+    #[must_use]
     pub fn with_disable_reuse_port(mut self, disable_reuse_port: bool) -> Self {
         self.config.disable_reuse_port = disable_reuse_port;
         self
     }
 
     /// Builds the [`P2PConfig`].
+    #[must_use]
     pub fn build(self) -> P2PConfig {
         self.config
     }
@@ -168,13 +199,15 @@ pub const DEFAULT_PING_INTERVAL: Duration = Duration::from_secs(1);
 pub const DEFAULT_PING_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Returns the default ping configuration.
+#[must_use]
 pub fn default_ping_config() -> ping::Config {
     ping::Config::new()
         .with_interval(DEFAULT_PING_INTERVAL)
         .with_timeout(DEFAULT_PING_TIMEOUT)
 }
 
-/// Resolves a TCP address string to a SocketAddr, ensuring the IP is specified.
+/// Resolves a TCP address string to a [`SocketAddr`], ensuring the IP is
+/// specified.
 fn resolve_listen_tcp_addr(addr: impl AsRef<str>) -> Result<SocketAddr> {
     let socket_addr: SocketAddr = addr
         .as_ref()
@@ -189,7 +222,8 @@ fn resolve_listen_tcp_addr(addr: impl AsRef<str>) -> Result<SocketAddr> {
     Ok(socket_addr)
 }
 
-/// Resolves a UDP address string to a SocketAddr, ensuring the IP is specified.
+/// Resolves a UDP address string to a [`SocketAddr`], ensuring the IP is
+/// specified.
 fn resolve_listen_udp_addr(addr: impl AsRef<str>) -> Result<SocketAddr> {
     let socket_addr: SocketAddr = addr
         .as_ref()

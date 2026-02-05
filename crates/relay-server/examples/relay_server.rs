@@ -33,7 +33,7 @@ async fn main() {
     let ct = CancellationToken::new();
 
     tokio::select! {
-        result = run_relay_p2p_node(&config, key, ct.child_token()) => {
+        result = run_relay_p2p_node(&config, &key, ct.child_token()) => {
             result.expect("Failed to run relay P2P node");
         }
         _ = tokio::signal::ctrl_c() => {

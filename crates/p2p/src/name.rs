@@ -352,6 +352,14 @@ const ADJECTIVES: &[&str] = &[
 ///
 /// The name is generated using a polynomial rolling hash of the base58-encoded
 /// peer ID, then selecting an adjective and noun from predefined lists.
+///
+/// # Panics
+///
+/// - Panic could occur if the hash value is not less than `u64::MAX`, but this
+///   is unlikely.
+/// - Panic could occur if the `NOUNS` or `ADJECTIVES` length is not less than
+///   `u64::MAX`, but this is unlikely.
+#[must_use]
 pub fn peer_name(id: &PeerId) -> String {
     // p is chosen to be 59 because it's prime and roughly equal to the number of
     // different characters you can have in base58 encoded strings. Base58

@@ -16,7 +16,7 @@ use crate::{config::default_ping_config, gater::ConnGater};
 /// - **Relay client**: Enables NAT traversal via relay servers
 /// - **Identify**: Exchanges peer information and supported protocols
 /// - **Ping**: Measures latency and keeps connections alive
-/// - **AutoNAT**: Detects NAT status and public reachability
+/// - **`AutoNAT`**: Detects NAT status and public reachability
 #[derive(NetworkBehaviour)]
 pub struct PlutoBehaviour {
     /// Connection gater behaviour.
@@ -27,17 +27,19 @@ pub struct PlutoBehaviour {
     pub identify: identify::Behaviour,
     /// Ping behaviour.
     pub ping: ping::Behaviour,
-    /// AutoNAT behaviour for NAT detection.
+    /// `AutoNAT` behaviour for NAT detection.
     pub autonat: autonat::Behaviour,
 }
 
 impl PlutoBehaviour {
     /// Creates a new Pluto behaviour with default configuration.
+    #[must_use]
     pub fn new(key: &Keypair, relay_client: relay::client::Behaviour) -> Self {
         PlutoBehaviourBuilder::default().build(key, relay_client)
     }
 
-    /// Returns a new builder for configuring a PlutoBehaviour.
+    /// Returns a new builder for configuring a `PlutoBehaviour`.
+    #[must_use]
     pub fn builder() -> PlutoBehaviourBuilder {
         PlutoBehaviourBuilder::default()
     }
@@ -73,29 +75,34 @@ impl Default for PlutoBehaviourBuilder {
 
 impl PlutoBehaviourBuilder {
     /// Creates a new builder with default configuration.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Sets the connection gater.
+    #[must_use]
     pub fn with_gater(mut self, gater: ConnGater) -> Self {
         self.gater = Some(gater);
         self
     }
 
     /// Sets the identify protocol string.
+    #[must_use]
     pub fn with_identify_protocol(mut self, protocol: impl Into<String>) -> Self {
         self.identify_protocol = protocol.into();
         self
     }
 
     /// Sets the user agent string.
+    #[must_use]
     pub fn with_user_agent(mut self, user_agent: impl Into<String>) -> Self {
         self.user_agent = user_agent.into();
         self
     }
 
-    /// Sets the AutoNAT configuration.
+    /// Sets the `AutoNAT` configuration.
+    #[must_use]
     pub fn with_autonat_config(mut self, config: autonat::Config) -> Self {
         self.autonat_config = Some(config);
         self

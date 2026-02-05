@@ -26,7 +26,7 @@ use pluto_p2p::{
     p2p::{Node, NodeType},
 };
 use pluto_peerinfo::{Behaviour, Config, Event, LocalPeerInfo};
-use pluto_tracing::{LokiConfig, TracingConfig};
+use pluto_tracing::{ConsoleConfig, LokiConfig, TracingConfig};
 use tokio::signal;
 use vise::MetricsCollection;
 use vise_exporter::MetricsExporter;
@@ -167,9 +167,10 @@ fn handle_event(event: SwarmEvent<CombinedEvent>, swarm: &mut Swarm<CombinedBeha
 }
 
 fn build_tracing_config(args: &Args) -> TracingConfig {
-    let mut builder = TracingConfig::builder()
-        .with_default_console()
-        .override_env_filter(&args.log_level);
+    let builder = TracingConfig::builder()
+        .console(ConsoleConfig::default())
+        .override_env_filter(args.log_level.clone())
+        .metrics(true);
 
     if let Some(loki_url) = &args.loki_url {
         let mut labels: HashMap<String, String> = HashMap::new();
@@ -181,14 +182,16 @@ fn build_tracing_config(args: &Args) -> TracingConfig {
             labels.insert(key.clone(), value.clone());
         }
 
-        builder = builder.loki(LokiConfig {
-            loki_url: loki_url.clone(),
-            labels,
-            extra_fields: HashMap::new(),
-        });
+        builder
+            .loki(LokiConfig {
+                loki_url: loki_url.clone(),
+                labels,
+                extra_fields: HashMap::new(),
+            })
+            .build()
+    } else {
+        builder.build()
     }
-
-    builder.build()
 }
 
 #[tokio::main]
@@ -278,8 +281,8 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let Node { mut swarm, .. } = Node::new(
-        P2PConfig::default(),
-        key,
+        &P2PConfig::default(),
+        &key,
         false,
         NodeType::TCP,
         |key, relay_client| CombinedBehaviour {

@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
+use bon::Builder;
+
 /// Configuration for the tracing.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Builder)]
 pub struct TracingConfig {
     /// Loki configuration. Enables loki logging if provided. If not - no loki
     /// logging is enabled.
@@ -20,7 +22,7 @@ pub struct TracingConfig {
 }
 
 /// Configuration for the loki logging.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Builder)]
 pub struct LokiConfig {
     /// URL of the Loki instance.
     pub loki_url: String,
@@ -33,7 +35,7 @@ pub struct LokiConfig {
 }
 
 /// Configuration for the console logging.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Builder)]
 pub struct ConsoleConfig {
     /// Whether to include the target module in logs.
     pub with_target: bool,
@@ -64,122 +66,5 @@ impl Default for ConsoleConfig {
             with_line_number: false,
             with_ansi: true,
         }
-    }
-}
-
-/// Builder for [`TracingConfig`].
-#[derive(Debug, Clone, Default)]
-pub struct TracingConfigBuilder {
-    tracing_config: TracingConfig,
-}
-
-impl TracingConfigBuilder {
-    /// Creates a new builder with default values.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Sets the Loki configuration.
-    pub fn loki(mut self, config: LokiConfig) -> Self {
-        self.tracing_config.loki = Some(config);
-        self
-    }
-
-    /// Sets the console configuration.
-    pub fn console(mut self, config: ConsoleConfig) -> Self {
-        self.tracing_config.console = Some(config);
-        self
-    }
-
-    /// Enables console logging with default configuration.
-    pub fn with_default_console(mut self) -> Self {
-        self.tracing_config.console = Some(ConsoleConfig::default());
-        self
-    }
-
-    /// Enables console logging and configures whether to include the target
-    /// module.
-    pub fn console_with_target(mut self, with_target: bool) -> Self {
-        self.tracing_config
-            .console
-            .get_or_insert_with(ConsoleConfig::default)
-            .with_target = with_target;
-        self
-    }
-
-    /// Enables console logging and configures whether to include the log level.
-    pub fn console_with_level(mut self, with_level: bool) -> Self {
-        self.tracing_config
-            .console
-            .get_or_insert_with(ConsoleConfig::default)
-            .with_level = with_level;
-        self
-    }
-
-    /// Enables console logging and configures whether to include thread IDs.
-    pub fn console_with_thread_ids(mut self, with_thread_ids: bool) -> Self {
-        self.tracing_config
-            .console
-            .get_or_insert_with(ConsoleConfig::default)
-            .with_thread_ids = with_thread_ids;
-        self
-    }
-
-    /// Enables console logging and configures whether to include the source
-    /// file name.
-    pub fn console_with_file(mut self, with_file: bool) -> Self {
-        self.tracing_config
-            .console
-            .get_or_insert_with(ConsoleConfig::default)
-            .with_file = with_file;
-        self
-    }
-
-    /// Enables console logging and configures whether to include line numbers.
-    pub fn console_with_line_number(mut self, with_line_number: bool) -> Self {
-        self.tracing_config
-            .console
-            .get_or_insert_with(ConsoleConfig::default)
-            .with_line_number = with_line_number;
-        self
-    }
-
-    /// Enables console logging and configures whether to use ANSI colors.
-    pub fn console_with_ansi(mut self, with_ansi: bool) -> Self {
-        self.tracing_config
-            .console
-            .get_or_insert_with(ConsoleConfig::default)
-            .with_ansi = with_ansi;
-        self
-    }
-
-    /// Enables metrics logging.
-    pub fn with_metrics(mut self, enabled: bool) -> Self {
-        self.tracing_config.metrics = enabled;
-        self
-    }
-
-    /// Sets whether metrics logging is enabled.
-    pub fn metrics(mut self, enabled: bool) -> Self {
-        self.tracing_config.metrics = enabled;
-        self
-    }
-
-    /// Sets the environment filter override.
-    pub fn override_env_filter(mut self, filter: impl Into<String>) -> Self {
-        self.tracing_config.override_env_filter = Some(filter.into());
-        self
-    }
-
-    /// Builds the [`TracingConfig`].
-    pub fn build(self) -> TracingConfig {
-        self.tracing_config
-    }
-}
-
-impl TracingConfig {
-    /// Creates a new builder for [`TracingConfig`].
-    pub fn builder() -> TracingConfigBuilder {
-        TracingConfigBuilder::new()
     }
 }

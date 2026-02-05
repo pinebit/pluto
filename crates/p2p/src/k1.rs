@@ -17,22 +17,34 @@ pub enum K1Error {
     #[error("K1 utility error: {0}")]
     K1UtilError(#[from] pluto_k1util::K1UtilError),
 
-    /// IOError.
+    /// `IOError`.
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
 }
 
 /// Returns the charon-enr-private-key path relative to the data dir.
+#[must_use]
 pub fn key_path(data_dir: &Path) -> PathBuf {
     data_dir.join(KEY_FILE_NAME)
 }
 
 /// Loads the private key from the data dir.
+///
+/// # Errors
+///
+/// - [`K1Error::K1UtilError`] if the private key cannot be loaded.
 pub fn load_priv_key(data_dir: &Path) -> Result<SecretKey> {
     pluto_k1util::load(&key_path(data_dir)).map_err(K1Error::K1UtilError)
 }
 
 /// Generates a new private key and saves it to the data dir.
+///
+/// # Errors
+///
+/// - [`K1Error::K1UtilError`] if the private key cannot be saved.
+/// - [`K1Error::IoError`] if the backup directory cannot be created.
+/// - [`K1Error::IoError`] if the private key cannot be copied to the backup
+///   directory.
 pub fn new_saved_priv_key(data_dir: &Path) -> Result<SecretKey> {
     backup_priv_key(data_dir)?;
 
@@ -69,9 +81,11 @@ fn backup_priv_key(data_dir: &Path) -> Result<()> {
             .expect("Backup path parent should exist"),
     )
     .map_err(K1Error::IoError)?;
-    if backup_path.is_dir() {
-        panic!("Backup path is a directory: {:?}", backup_path);
-    }
+    assert!(
+        !backup_path.is_dir(),
+        "Backup path is a directory: {}",
+        backup_path.display()
+    );
     std::fs::copy(key_path, backup_path).map_err(K1Error::IoError)?;
     Ok(())
 }

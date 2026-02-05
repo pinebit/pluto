@@ -34,6 +34,7 @@ pub struct Config {
 impl Config {
     /// Creates a new open gater configuration that does not gate any
     /// connections.
+    #[must_use]
     pub fn open() -> Self {
         Self {
             peer_ids: HashSet::new(),
@@ -44,6 +45,7 @@ impl Config {
 
     /// Creates a new closed gater configuration that gates all connections
     /// except those explicitly allowed.
+    #[must_use]
     pub fn closed() -> Self {
         Self {
             peer_ids: HashSet::new(),
@@ -53,19 +55,21 @@ impl Config {
     }
 
     /// Sets the allowed peer IDs.
+    #[must_use]
     pub fn with_peer_ids(mut self, peer_ids: Vec<PeerId>) -> Self {
         self.peer_ids = peer_ids.into_iter().collect();
         self
     }
 
     /// Sets the relay peers.
+    #[must_use]
     pub fn with_relays(mut self, relays: Vec<Arc<MutablePeer>>) -> Self {
         self.relays = relays;
         self
     }
 }
 
-/// ConnGater filters incoming and outgoing connections by the cluster peers.
+/// `ConnGater` filters incoming and outgoing connections by the cluster peers.
 #[derive(Debug, Clone, Default)]
 pub struct ConnGater {
     config: Config,
@@ -74,6 +78,7 @@ pub struct ConnGater {
 
 impl ConnGater {
     /// Creates a new connection gater with the given configuration.
+    #[must_use]
     pub fn new(config: Config) -> Self {
         Self {
             config,
@@ -83,6 +88,7 @@ impl ConnGater {
 
     /// Creates a new connection gater that limits access to the cluster peers
     /// and relays.
+    #[must_use]
     pub fn new_conn_gater(peers: Vec<PeerId>, relays: Vec<Arc<MutablePeer>>) -> Self {
         Self {
             config: Config::closed().with_peer_ids(peers).with_relays(relays),
@@ -91,6 +97,7 @@ impl ConnGater {
     }
 
     /// Creates a new open gater that does not gate any connections.
+    #[must_use]
     pub fn new_open_gater() -> Self {
         Self {
             config: Config::open(),
@@ -99,6 +106,7 @@ impl ConnGater {
     }
 
     /// Returns true if the gater is open (not gating any connections).
+    #[must_use]
     pub fn is_open(&self) -> bool {
         self.config.open
     }

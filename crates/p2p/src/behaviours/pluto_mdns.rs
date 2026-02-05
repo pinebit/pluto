@@ -15,11 +15,16 @@ pub struct PlutoMdnsBehaviour {
 
 impl PlutoMdnsBehaviour {
     /// Creates a new Pluto Mdns behaviour with default configuration.
+    ///
+    /// # Panics
+    /// - If the mDNS behaviour cannot be created.
+    #[must_use]
     pub fn new(key: &Keypair, relay_client: relay::client::Behaviour) -> Self {
         PlutoMdnsBehaviourBuilder::default().build(key, relay_client)
     }
 
-    /// Returns a new builder for configuring a PlutoMdnsBehaviour.
+    /// Returns a new builder for configuring a `PlutoMdnsBehaviour`.
+    #[must_use]
     pub fn builder() -> PlutoMdnsBehaviourBuilder {
         PlutoMdnsBehaviourBuilder::default()
     }
@@ -34,11 +39,13 @@ pub struct PlutoMdnsBehaviourBuilder {
 
 impl PlutoMdnsBehaviourBuilder {
     /// Creates a new builder with default configuration.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Replaces the inner [`PlutoBehaviourBuilder`] entirely.
+    #[must_use]
     pub fn with_pluto(mut self, pluto: PlutoBehaviourBuilder) -> Self {
         self.pluto = pluto;
         self
@@ -52,6 +59,7 @@ impl PlutoMdnsBehaviourBuilder {
     ///     .configure_pluto(|p| p.with_ping_interval(Duration::from_secs(5)))
     ///     .build(&key, relay_client)
     /// ```
+    #[must_use]
     pub fn configure_pluto(
         mut self,
         f: impl FnOnce(PlutoBehaviourBuilder) -> PlutoBehaviourBuilder,
@@ -61,6 +69,7 @@ impl PlutoMdnsBehaviourBuilder {
     }
 
     /// Sets the mDNS configuration.
+    #[must_use]
     pub fn with_mdns_config(mut self, config: mdns::Config) -> Self {
         self.mdns_config = config;
         self
@@ -68,6 +77,12 @@ impl PlutoMdnsBehaviourBuilder {
 
     /// Builds the [`PlutoMdnsBehaviour`] with the provided keypair and relay
     /// client.
+    ///
+    /// # Panics
+    ///
+    /// - If the mDNS behaviour cannot be created (this is okay since we use
+    ///   mdns only for examples).
+    #[must_use]
     pub fn build(
         self,
         key: &Keypair,

@@ -96,7 +96,7 @@ pub(crate) fn filter_advertised_addresses(
     mut external_addrs: Vec<Multiaddr>,
     mut internal_addrs: Vec<Multiaddr>,
     exclude_interval_private: bool,
-) -> crate::p2p::Result<Vec<Multiaddr>> {
+) -> Vec<Multiaddr> {
     external_addrs.dedup();
     internal_addrs.dedup();
 
@@ -104,7 +104,7 @@ pub(crate) fn filter_advertised_addresses(
         internal_addrs.retain(|addr| !addr.is_private());
     }
 
-    Ok(external_addrs.into_iter().chain(internal_addrs).collect())
+    external_addrs.into_iter().chain(internal_addrs).collect()
 }
 
 /// Returns the default swarm configuration.
@@ -118,7 +118,7 @@ pub(crate) fn default_tcp_config() -> tcp::Config {
 }
 
 /// Converts a secret key to a libp2p keypair.
-pub(crate) fn keypair_from_secret_key(key: k256::SecretKey) -> crate::p2p::Result<Keypair> {
+pub(crate) fn keypair_from_secret_key(key: &k256::SecretKey) -> crate::p2p::Result<Keypair> {
     let mut der = key.to_sec1_der()?;
     let keypair = Keypair::secp256k1_from_der(&mut der)?;
     Ok(keypair)

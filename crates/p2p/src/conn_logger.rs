@@ -215,12 +215,12 @@ impl<M: ConnectionLoggerMetrics + 'static> NetworkBehaviour for ConnectionLogger
     type ConnectionHandler = dummy_handler::Handler;
     type ToSwarm = ();
 
-    #[instrument(skip(self, _local_addr, remote_addr), fields(peer = %peer_name(&peer), addr = %remote_addr))]
+    #[instrument(skip(self), fields(peer = %peer_name(&peer), addr = %remote_addr))]
     fn handle_established_inbound_connection(
         &mut self,
-        _connection_id: ConnectionId,
+        _: ConnectionId,
         peer: PeerId,
-        _local_addr: &Multiaddr,
+        _: &Multiaddr,
         remote_addr: &Multiaddr,
     ) -> Result<THandler<Self>, ConnectionDenied> {
         debug!(
@@ -234,14 +234,14 @@ impl<M: ConnectionLoggerMetrics + 'static> NetworkBehaviour for ConnectionLogger
         Ok(dummy_handler::Handler)
     }
 
-    #[instrument(skip(self, _role_override, _port_use), fields(peer = %peer_name(&peer), addr = %addr))]
+    #[instrument(skip(self), fields(peer = %peer_name(&peer), addr = %addr))]
     fn handle_established_outbound_connection(
         &mut self,
-        _connection_id: ConnectionId,
+        _: ConnectionId,
         peer: PeerId,
         addr: &Multiaddr,
-        _role_override: libp2p::core::Endpoint,
-        _port_use: libp2p::core::transport::PortUse,
+        _: libp2p::core::Endpoint,
+        _: libp2p::core::transport::PortUse,
     ) -> Result<THandler<Self>, ConnectionDenied> {
         debug!(
             peer = %peer_name(&peer),

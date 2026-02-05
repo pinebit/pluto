@@ -118,6 +118,10 @@ impl SemVer {
     }
 
     /// Try to parse a semantic version from a string.
+    ///
+    /// # Errors
+    ///
+    /// - [`SemVerError::InvalidFormat`] if the version string is invalid.
     pub fn parse<T: AsRef<str>>(value: T) -> Result<SemVer> {
         let matches = SEMVER_REGEX
             .captures(value.as_ref())

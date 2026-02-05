@@ -25,7 +25,7 @@ const PRIVATE_CIDR4: &[(&str, Ipv4Addr, u8)] = &[
 /// Private IPv6 CIDR ranges.
 const PRIVATE_CIDR6: &[(&str, Ipv6Addr, u8)] = &[
     // localhost
-    ("::1/128", Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1), 128),
+    ("::1/128", Ipv6Addr::LOCALHOST, 128),
     // ULA reserved
     ("fc00::/7", Ipv6Addr::new(0xfc00, 0, 0, 0, 0, 0, 0, 0), 7),
     // link local
@@ -34,7 +34,7 @@ const PRIVATE_CIDR6: &[(&str, Ipv6Addr, u8)] = &[
 
 /// Unroutable IPv4 CIDR ranges.
 const UNROUTABLE_CIDR4: &[(&str, Ipv4Addr, u8)] = &[
-    ("0.0.0.0/8", Ipv4Addr::new(0, 0, 0, 0), 8),
+    ("0.0.0.0/8", Ipv4Addr::UNSPECIFIED, 8),
     ("192.0.0.0/26", Ipv4Addr::new(192, 0, 0, 0), 26),
     ("192.0.2.0/24", Ipv4Addr::new(192, 0, 2, 0), 24),
     ("192.88.99.0/24", Ipv4Addr::new(192, 88, 99, 0), 24),
@@ -43,7 +43,7 @@ const UNROUTABLE_CIDR4: &[(&str, Ipv4Addr, u8)] = &[
     ("203.0.113.0/24", Ipv4Addr::new(203, 0, 113, 0), 24),
     ("224.0.0.0/4", Ipv4Addr::new(224, 0, 0, 0), 4),
     ("240.0.0.0/4", Ipv4Addr::new(240, 0, 0, 0), 4),
-    ("255.255.255.255/32", Ipv4Addr::new(255, 255, 255, 255), 32),
+    ("255.255.255.255/32", Ipv4Addr::BROADCAST, 32),
 ];
 
 /// Unroutable IPv6 CIDR ranges.
@@ -79,7 +79,7 @@ const NAT64_CIDRS: &[(&str, Ipv6Addr, u8)] = &[
 ];
 
 /// Unresolvable domains that do not resolve to an IP address.
-/// Ref: https://en.wikipedia.org/wiki/Special-use_domain_name#Reserved_domain_names
+/// Ref: <https://en.wikipedia.org/wiki/Special-use_domain_name#Reserved_domain_names>
 const UNRESOLVABLE_DOMAINS: &[&str] = &[
     // Reverse DNS Lookup
     ".in-addr.arpa",
@@ -89,7 +89,7 @@ const UNRESOLVABLE_DOMAINS: &[&str] = &[
 ];
 
 /// Private use domains reserved for private use with no central authority.
-/// Ref: https://en.wikipedia.org/wiki/Special-use_domain_name#Reserved_domain_names
+/// Ref: <https://en.wikipedia.org/wiki/Special-use_domain_name#Reserved_domain_names>
 const PRIVATE_USE_DOMAINS: &[&str] = &[
     // RFC 8375: Reserved for home networks
     ".home.arpa",
@@ -116,11 +116,10 @@ pub trait Manet {
 
 impl Manet for Multiaddr {
     fn is_public(&self) -> bool {
-        for proto in self.iter() {
+        for proto in self {
             match proto {
                 Protocol::Ip6zone(_) => {
                     // Skip zone identifier, continue checking
-                    continue;
                 }
                 Protocol::Ip4(ip) => {
                     return !in_ipv4_range(ip, PRIVATE_CIDR4)
@@ -173,11 +172,10 @@ impl Manet for Multiaddr {
     }
 
     fn is_private(&self) -> bool {
-        for proto in self.iter() {
+        for proto in self {
             match proto {
                 Protocol::Ip6zone(_) => {
                     // Skip zone identifier, continue checking
-                    continue;
                 }
                 Protocol::Ip4(ip) => {
                     return in_ipv4_range(ip, PRIVATE_CIDR4);

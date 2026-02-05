@@ -104,9 +104,17 @@ pub struct Node<B: NetworkBehaviour> {
 
 impl<B: NetworkBehaviour> Node<B> {
     /// Creates a new node.
+    ///
+    /// # Errors
+    ///
+    /// - [`P2PError::FailedToBuildSwarm`] if the swarm cannot be built.
+    /// - [`P2PError::FailedToDecodeLibp2pKeypair`] if the libp2p keypair cannot
+    ///   be decoded.
+    /// - [`P2PError::FailedToConvertSecretKeyToLibp2pKeypair`] if the secret
+    ///   key cannot be converted to a libp2p keypair.
     pub fn new<F>(
-        cfg: P2PConfig,
-        key: k256::SecretKey,
+        cfg: &P2PConfig,
+        key: &k256::SecretKey,
         filter_private_addrs: bool,
         node_type: NodeType,
         behaviour_fn: F,
@@ -121,7 +129,7 @@ impl<B: NetworkBehaviour> Node<B> {
             NodeType::QUIC => Self::new_with_quic(keypair, behaviour_fn),
         }?;
 
-        node.apply_config(&cfg, filter_private_addrs)?;
+        node.apply_config(cfg, filter_private_addrs)?;
 
         Ok(node)
     }
@@ -151,7 +159,7 @@ impl<B: NetworkBehaviour> Node<B> {
         }
 
         let filtered_addrs =
-            utils::filter_advertised_addresses(addrs, external_addrs, filter_private_addrs)?;
+            utils::filter_advertised_addresses(addrs, external_addrs, filter_private_addrs);
 
         for addr in filtered_addrs {
             self.swarm.listen_on(addr)?;
@@ -161,6 +169,14 @@ impl<B: NetworkBehaviour> Node<B> {
     }
 
     /// Creates a new node with QUIC and TCP.
+    ///
+    /// # Errors
+    ///
+    /// - [`P2PError::FailedToBuildSwarm`] if the swarm cannot be built.
+    /// - [`P2PError::FailedToDecodeLibp2pKeypair`] if the libp2p keypair cannot
+    ///   be decoded.
+    /// - [`P2PError::FailedToConvertSecretKeyToLibp2pKeypair`] if the secret
+    ///   key cannot be converted to a libp2p keypair.
     fn new_with_quic<F>(keypair: Keypair, behaviour_fn: F) -> Result<Self>
     where
         F: Fn(&Keypair, relay::client::Behaviour) -> B,
@@ -191,6 +207,14 @@ impl<B: NetworkBehaviour> Node<B> {
     }
 
     /// Creates a new node with TCP.
+    ///
+    /// # Errors
+    ///
+    /// - [`P2PError::FailedToBuildSwarm`] if the swarm cannot be built.
+    /// - [`P2PError::FailedToDecodeLibp2pKeypair`] if the libp2p keypair cannot
+    ///   be decoded.
+    /// - [`P2PError::FailedToConvertSecretKeyToLibp2pKeypair`] if the secret
+    ///   key cannot be converted to a libp2p keypair.
     fn new_with_tcp<F>(keypair: Keypair, behaviour_fn: F) -> Result<Self>
     where
         F: Fn(&Keypair, relay::client::Behaviour) -> B,
@@ -220,9 +244,17 @@ impl<B: NetworkBehaviour> Node<B> {
     }
 
     /// Creates a new node with relay server.
+    ///
+    /// # Errors
+    ///
+    /// - [`P2PError::FailedToBuildSwarm`] if the swarm cannot be built.
+    /// - [`P2PError::FailedToDecodeLibp2pKeypair`] if the libp2p keypair cannot
+    ///   be decoded.
+    /// - [`P2PError::FailedToConvertSecretKeyToLibp2pKeypair`] if the secret
+    ///   key cannot be converted to a libp2p keypair.
     pub fn new_relay_server<F>(
         _cfg: &P2PConfig,
-        key: k256::SecretKey,
+        key: &k256::SecretKey,
         behaviour_fn: F,
     ) -> Result<Self>
     where

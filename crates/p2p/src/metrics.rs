@@ -1,4 +1,7 @@
-use vise::*;
+use vise::{
+    Counter, EncodeLabelSet, EncodeLabelValue, Family, Gauge, Global, Histogram, LabeledFamily,
+    Metrics,
+};
 
 /// Buckets for the ping latency histogram.
 pub const BUCKETS: [f64; 11] = [
@@ -99,6 +102,7 @@ pub struct PeerConnectionLabels {
 
 impl PeerConnectionLabels {
     /// Creates a new peer connection labels.
+    #[must_use]
     pub fn new(peer: &str, r#type: ConnectionType, protocol: Protocol) -> Self {
         Self {
             peer: peer.to_string(),
@@ -121,6 +125,7 @@ pub struct PeerStreamLabels {
 
 impl PeerStreamLabels {
     /// Creates a new peer stream labels.
+    #[must_use]
     pub fn new(peer: &str, direction: Direction, protocol: Protocol) -> Self {
         Self {
             peer: peer.to_string(),
@@ -139,6 +144,7 @@ pub struct PeerNetworkLabels {
 
 impl PeerNetworkLabels {
     /// Creates a new peer network labels.
+    #[must_use]
     pub fn new(peer: &str, protocol: Protocol) -> Self {
         Self {
             peer: peer.to_string(),

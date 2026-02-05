@@ -26,6 +26,12 @@ pub enum Error {
 type Result<T> = std::result::Result<T, Error>;
 
 /// Initializes the tracing subscriber.
+///
+/// # Errors
+///
+/// - [`Error::InitError`] if the tracing subscriber cannot be initialized.
+/// - [`Error::ParseError`] if the Loki URL cannot be parsed.
+/// - [`Error::CreateLayerError`] if the Loki layer cannot be created.
 pub fn init(config: &TracingConfig) -> Result<Option<BackgroundTask>> {
     let env_filter = if let Some(override_env_filter) = config.override_env_filter.as_ref() {
         EnvFilter::from_str(override_env_filter).unwrap_or_else(|_| default_env_filter())

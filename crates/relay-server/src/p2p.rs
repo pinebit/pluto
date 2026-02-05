@@ -21,10 +21,10 @@ use pluto_p2p::{gater::ConnGater, p2p::Node};
 #[instrument(skip(config, key, ct))]
 pub async fn run_relay_p2p_node(
     config: &Config,
-    key: SecretKey,
+    key: &SecretKey,
     ct: CancellationToken,
 ) -> Result<Node<RelayServerBehaviour>> {
-    let mut node = Node::new_relay_server(&config.p2p_config, key.clone(), |key| {
+    let mut node = Node::new_relay_server(&config.p2p_config, key, |key| {
         RelayServerBehaviour::builder()
             .with_gater(ConnGater::new_open_gater())
             .with_relay_config(create_relay_config(config))

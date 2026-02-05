@@ -60,10 +60,10 @@ pub struct AddrInfo {
 /// relay.
 #[derive(Clone, Debug)]
 pub struct Peer {
-    /// LibP2P peer identity.
+    /// `LibP2P` peer identity.
     pub id: PeerId,
 
-    /// List of libp2p multiaddresses of the peer.
+    /// List of `libp2p` multiaddresses of the peer.
     pub addresses: Vec<Multiaddr>,
 
     /// Index is the order of this node in the cluster.
@@ -76,6 +76,7 @@ pub struct Peer {
 
 impl Peer {
     /// Creates a new relay peer from address information.
+    #[must_use]
     pub fn new_relay_peer(info: &AddrInfo) -> Peer {
         Peer {
             id: info.id,
@@ -86,6 +87,17 @@ impl Peer {
     }
 
     /// Creates a Peer from a ENR.
+    ///
+    /// # Errors
+    ///
+    /// - [`PeerError::MissingPublicKeyInEnr`] if the public key is missing in
+    ///   the ENR.
+    /// - [`PeerError::FailedToDecodeProtobuf`] if libp2p public key cannot be
+    ///   decoded.
+    /// - [`PeerError::FailedToParseSecp256k1PublicKey`] if secp256k1 public key
+    ///   cannot be parsed.
+    /// - [`PeerError::FailedToParseLibp2pPublicKey`] if libp2p public key
+    ///   cannot be parsed.
     pub fn from_enr(enr: &Record, index: usize) -> Result<Peer> {
         let id = peer_id_from_key(enr.public_key.ok_or(PeerError::MissingPublicKeyInEnr)?)?;
 
@@ -97,18 +109,29 @@ impl Peer {
         })
     }
 
-    /// Returns share index of this Peer. ShareIdx is 1-indexed while peer index
-    /// is 0-indexed.
+    /// Returns share index of this `Peer`. `ShareIdx` is 1-indexed while peer
+    /// index is 0-indexed.
+    #[must_use]
     pub fn share_idx(&self) -> usize {
         self.index.wrapping_add(1)
     }
 
     /// Returns the public key of the peer.
+    ///
+    /// # Errors
+    ///
+    /// - [`PeerError::FailedToDecodeProtobuf`] if libp2p public key cannot be
+    ///   decoded.
+    /// - [`PeerError::FailedToParseSecp256k1PublicKey`] if secp256k1 public key
+    ///   cannot be parsed.
+    /// - [`PeerError::FailedToParseLibp2pPublicKey`] if libp2p public key
+    ///   cannot be parsed.
     pub fn public_key(&self) -> Result<K256PublicKey> {
         peer_id_to_public_key(&self.id)
     }
 
     /// Returns the libp2p peer address info (peer ID and multiaddrs).
+    #[must_use]
     pub fn addr_info(&self) -> AddrInfo {
         AddrInfo {
             id: self.id,
@@ -125,7 +148,7 @@ pub enum MutablePeerError {
     PoisonError,
 }
 
-/// MutablePeer is a mutable peer that can be updated.
+/// `MutablePeer` is a mutable peer that can be updated.
 #[derive(Debug, Clone)]
 pub struct MutablePeer {
     /// Inner state of the mutable peer.
@@ -135,7 +158,7 @@ pub struct MutablePeer {
 /// Subscriber is a function that is called when the peer is updated.
 pub type Subscriber = Box<dyn Fn(&Peer) + Send + Sync + 'static>;
 
-/// MutablePeerInner is the inner state of a MutablePeer.
+/// `MutablePeerInner` is the inner state of a `MutablePeer`.
 pub struct MutablePeerInner {
     /// Peer.
     peer: Option<Peer>,
@@ -157,6 +180,7 @@ type MutablePeerResult<T> = std::result::Result<T, MutablePeerError>;
 
 impl MutablePeer {
     /// Creates a new mutable peer with an initial value.
+    #[must_use]
     pub fn new(peer: Peer) -> Self {
         Self {
             inner: Arc::new(Mutex::new(MutablePeerInner {
@@ -167,7 +191,12 @@ impl MutablePeer {
     }
 
     /// Updates the mutable peer and calls all subscribers.
-    pub fn set(&self, peer: Peer) -> MutablePeerResult<()> {
+    ///
+    /// # Errors
+    ///
+    /// - [`MutablePeerError::PoisonError`] if the mutable peer cannot be
+    ///   locked.
+    pub fn set(&self, peer: &Peer) -> MutablePeerResult<()> {
         let mut inner = self
             .inner
             .lock()
@@ -178,6 +207,11 @@ impl MutablePeer {
     }
 
     /// Returns the current peer or None if not available.
+    ///
+    /// # Errors
+    ///
+    /// - [`MutablePeerError::PoisonError`] if the mutable peer cannot be
+    ///   locked.
     pub fn peer(&self) -> MutablePeerResult<Option<Peer>> {
         let inner = self
             .inner
@@ -187,6 +221,11 @@ impl MutablePeer {
     }
 
     /// Registers a function that is called when the peer is updated.
+    ///
+    /// # Errors
+    ///
+    /// - [`MutablePeerError::PoisonError`] if the mutable peer cannot be
+    ///   locked.
     pub fn subscribe(&self, sub: Subscriber) -> MutablePeerResult<()> {
         let mut inner = self
             .inner
@@ -197,26 +236,52 @@ impl MutablePeer {
     }
 }
 
-/// Converts a PeerId to a K256PublicKey.
+/// Converts a `PeerId` to a `K256PublicKey`.
 /// Only works for secp256k1 keys.
+///
+/// # Errors
+///
+/// - [`PeerError::FailedToDecodeProtobuf`] if libp2p public key cannot be
+///   decoded.
+/// - [`PeerError::FailedToParseSecp256k1PublicKey`] if secp256k1 public key
+///   cannot be parsed.
+/// - [`PeerError::FailedToParseLibp2pPublicKey`] if libp2p public key cannot be
+///   parsed.
 pub fn peer_id_to_public_key(peer_id: &PeerId) -> Result<K256PublicKey> {
     let libp2p_pk = peer_id_to_libp2p_pk(peer_id)?;
     pluto_k1util::public_key_from_libp2p(&libp2p_pk).map_err(Into::into)
 }
 
-/// Extracts the libp2p PublicKey from a PeerId.
+/// Extracts the libp2p `PublicKey` from a `PeerId`.
+///
+/// # Errors
+///
+/// - [`PeerError::FailedToDecodeProtobuf`] if libp2p public key cannot be
+///   decoded.
 pub fn peer_id_to_libp2p_pk(peer_id: &PeerId) -> Result<Libp2pPublicKey> {
     Libp2pPublicKey::try_decode_protobuf(peer_id.as_ref().digest()).map_err(Into::into)
 }
 
-/// Converts a K256PublicKey to a libp2p PublicKey.
+/// Converts a `K256PublicKey` to a libp2p `PublicKey`.
+///
+/// # Errors
+///
+/// - [`PeerError::FailedToParseLibp2pPublicKey`] if libp2p public key cannot be
+///   parsed.
 fn k256_pk_to_libp2p_pk(pk: &K256PublicKey) -> Result<Libp2pPublicKey> {
     let sec1_bytes = pk.to_sec1_bytes();
     let secp_key = libp2p::identity::secp256k1::PublicKey::try_from_bytes(&sec1_bytes)?;
     Ok(Libp2pPublicKey::from(secp_key))
 }
 
-/// Converts a K256PublicKey to a PeerId.
+/// Converts a `K256PublicKey` to a `PeerId`.
+///
+/// # Errors
+///
+/// - [`PeerError::FailedToParseSecp256k1PublicKey`] if secp256k1 public key
+///   cannot be parsed.
+/// - [`PeerError::FailedToParseLibp2pPublicKey`] if libp2p public key cannot be
+///   parsed.
 pub fn peer_id_from_key(key: K256PublicKey) -> Result<PeerId> {
     let libp2p_pk = k256_pk_to_libp2p_pk(&key)?;
     Ok(PeerId::from_public_key(&libp2p_pk))
@@ -224,6 +289,15 @@ pub fn peer_id_from_key(key: K256PublicKey) -> Result<PeerId> {
 
 /// `verify_p2p_key` returns an error if the p2p key doesn't match any lock
 /// operator ENR.
+///
+/// # Errors
+///
+/// - [`PeerError::UnknownPublicKey`] if the p2p key doesn't match any lock
+///   operator ENR.
+/// - [`PeerError::FailedToParseSecp256k1PublicKey`] if secp256k1 public key
+///   cannot be parsed.
+/// - [`PeerError::FailedToParseLibp2pPublicKey`] if libp2p public key cannot be
+///   parsed.
 pub fn verify_p2p_key(peers: &[Peer], key: &SecretKey) -> Result<()> {
     let want = key.public_key();
 
