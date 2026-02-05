@@ -179,7 +179,7 @@ impl From<BLST_ERROR> for BlsError {
             BLST_ERROR::BLST_VERIFY_FAIL => Self::VerifyFailed,
             BLST_ERROR::BLST_PK_IS_INFINITY => Self::InvalidPublicKey,
             BLST_ERROR::BLST_BAD_SCALAR => Self::InvalidScalar,
-            _ => Self::Unknown,
+            BLST_ERROR::BLST_SUCCESS => Self::Unknown,
         }
     }
 }

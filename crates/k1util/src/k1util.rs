@@ -13,7 +13,7 @@ use libp2p::identity::PublicKey as Libp2pPublicKey;
 /// `SCALAR_LEN` is the length of secp256k1 scalar.
 pub const SCALAR_LEN: usize = 32;
 
-/// `K1_HASH_LEN`` is the length of secp256k1 signature hash/digest.
+/// `K1_HASH_LEN` is the length of secp256k1 signature hash/digest.
 pub const K1_HASH_LEN: usize = 32;
 
 /// `SIGNATURE_LEN` is the length of secp256k1 signature.

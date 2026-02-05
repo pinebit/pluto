@@ -331,7 +331,7 @@ fn lagrange_interpolate_signature(
     let coeffs = compute_lagrange_coefficients(indices)?;
 
     // Multiply each signature by its Lagrange coefficient and aggregate
-    let first_sig_scaled = signature_mult(&signatures[0], &coeffs[0])?;
+    let first_sig_scaled = signature_mult(&signatures[0], &coeffs[0]);
     let mut result_p2 = blst::blst_p2::default();
 
     unsafe {
@@ -340,7 +340,7 @@ fn lagrange_interpolate_signature(
         blst::blst_p2_from_affine(&raw mut result_p2, first_affine);
 
         for i in 1..signatures.len() {
-            let sig_scaled = signature_mult(&signatures[i], &coeffs[i])?;
+            let sig_scaled = signature_mult(&signatures[i], &coeffs[i]);
             let sig_affine: &blst::blst_p2_affine = (&sig_scaled).into();
             blst::blst_p2_add_or_double_affine(
                 &raw mut result_p2,
@@ -388,7 +388,7 @@ fn compute_lagrange_coefficients(indices: &[Index]) -> Result<Vec<blst::blst_sca
                 // For negative differences, we need to work in the scalar field
                 // x_j - x_i (mod r) where r is the curve order
                 let diff_val = x_i.abs_diff(x_j);
-                scalar_negate(&scalar_from_u64(u64::from(diff_val)))?
+                scalar_negate(&scalar_from_u64(u64::from(diff_val)))
             };
 
             denominator = scalar_mult_scalars(&denominator, &diff)?;
@@ -434,7 +434,7 @@ fn scalar_add_secret(sk1: &BlstSecretKey, sk2: &BlstSecretKey) -> Result<BlstSec
 }
 
 /// Multiply signature by scalar
-fn signature_mult(sig: &BlstSignature, scalar: &blst::blst_scalar) -> Result<BlstSignature, Error> {
+fn signature_mult(sig: &BlstSignature, scalar: &blst::blst_scalar) -> BlstSignature {
     let mut sig_proj = blst::blst_p2::default();
     let mut result_p2 = blst::blst_p2::default();
     let mut result_affine = blst::blst_p2_affine::default();
@@ -454,7 +454,7 @@ fn signature_mult(sig: &BlstSignature, scalar: &blst::blst_scalar) -> Result<Bls
         blst::blst_p2_to_affine(&raw mut result_affine, &raw const result_p2);
     }
 
-    Ok(BlstSignature::from(result_affine))
+    BlstSignature::from(result_affine)
 }
 
 /// Add two scalars
@@ -485,7 +485,7 @@ fn scalar_mult_scalars(
 }
 
 /// Negate a scalar
-fn scalar_negate(a: &blst::blst_scalar) -> Result<blst::blst_scalar, Error> {
+fn scalar_negate(a: &blst::blst_scalar) -> blst::blst_scalar {
     // To negate in the field, we compute (r - a) where r is the curve order
     // But blst doesn't expose this directly, so we use: -a ≡ r - a
     // We can compute this as: 0 - a
@@ -506,7 +506,7 @@ fn scalar_negate(a: &blst::blst_scalar) -> Result<blst::blst_scalar, Error> {
         blst::blst_scalar_from_fr(&raw mut result_scalar, &raw const result_fr);
     }
 
-    Ok(result_scalar)
+    result_scalar
 }
 
 /// Divide two scalars (multiply by inverse)

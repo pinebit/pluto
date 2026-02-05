@@ -711,7 +711,7 @@ where
             }
 
             let prepares =
-                filter_by_round_and_value(&flatten(buffer), MSG_PREPARE, msg.round(), msg.value());
+                filter_by_round_and_value(&flatten(buffer), MSG_PREPARE, msg.round(), &msg.value());
 
             if prepares.len() as i64 >= d.quorum() {
                 (UPON_QUORUM_PREPARES, Some(prepares))
@@ -726,7 +726,7 @@ where
             }
 
             let commits =
-                filter_by_round_and_value(&flatten(buffer), MSG_COMMIT, msg.round(), msg.value());
+                filter_by_round_and_value(&flatten(buffer), MSG_COMMIT, msg.round(), &msg.value());
             if commits.len() as i64 >= d.quorum() {
                 (UPON_QUORUM_COMMITS, Some(commits))
             } else {
@@ -812,8 +812,7 @@ where
 {
     match msg.type_() {
         MSG_PRE_PREPARE => is_justified_pre_prepare(d, instance, msg, compare_failure_round),
-        MSG_PREPARE => true,
-        MSG_COMMIT => true,
+        MSG_PREPARE | MSG_COMMIT => true,
         MSG_ROUND_CHANGE => is_justified_round_change(d, msg),
         MSG_DECIDED => is_justified_decided(d, msg),
         _ => panic!("bug: invalid message type"),
@@ -1194,7 +1193,7 @@ fn filter_by_round_and_value<I, V, C>(
     msgs: &Vec<Msg<I, V, C>>,
     message_type: MessageType,
     round: i64,
-    value: V,
+    value: &V,
 ) -> Vec<Msg<I, V, C>>
 where
     V: PartialEq,
