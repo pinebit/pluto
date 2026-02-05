@@ -621,7 +621,7 @@ mod tests {
         );
         assert_eq!(
             lock.distributed_validators[0].partial_deposit_data[0].amount,
-            5919415281453547599
+            5_919_415_281_453_547_599
         );
         assert_eq!(lock.distributed_validators[0].partial_deposit_data[1].pub_key, hex::decode("1814be823350eab13935f31d84484517e924aef78ae151c00755925836b7075885650c30ec29a3703934bf50a28da102").unwrap());
         assert_eq!(

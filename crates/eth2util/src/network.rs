@@ -75,7 +75,7 @@ mod predefined {
         chain_id: 1,
         name: "mainnet",
         genesis_fork_version_hex: "0x00000000",
-        genesis_timestamp: 1606824023,
+        genesis_timestamp: 1_606_824_023,
         capella_hard_fork: "0x03000000",
     };
 
@@ -93,7 +93,7 @@ mod predefined {
         chain_id: 100,
         name: "gnosis",
         genesis_fork_version_hex: "0x00000064",
-        genesis_timestamp: 1638993340,
+        genesis_timestamp: 1_638_993_340,
         capella_hard_fork: "0x03000064",
     };
 
@@ -102,16 +102,16 @@ mod predefined {
         chain_id: 10200,
         name: "chiado",
         genesis_fork_version_hex: "0x0000006f",
-        genesis_timestamp: 1665396300,
+        genesis_timestamp: 1_665_396_300,
         capella_hard_fork: "0x0300006f",
     };
 
     /// Sepolia network.
     pub const SEPOLIA: Network = Network {
-        chain_id: 11155111,
+        chain_id: 11_155_111,
         name: "sepolia",
         genesis_fork_version_hex: "0x90000069",
-        genesis_timestamp: 1655733600,
+        genesis_timestamp: 1_655_733_600,
         capella_hard_fork: "0x90000072",
     };
 
@@ -120,7 +120,7 @@ mod predefined {
         chain_id: 17000,
         name: "holesky",
         genesis_fork_version_hex: "0x01017000",
-        genesis_timestamp: 1696000704,
+        genesis_timestamp: 1_696_000_704,
         capella_hard_fork: "0x04017000",
     };
 
@@ -129,7 +129,7 @@ mod predefined {
         chain_id: 560048,
         name: "hoodi",
         genesis_fork_version_hex: "0x10000910",
-        genesis_timestamp: 1742213400,
+        genesis_timestamp: 1_742_213_400,
         capella_hard_fork: "0x40000910",
     };
 }

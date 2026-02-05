@@ -4,7 +4,7 @@
 #![allow(clippy::all)]
 #![allow(rustdoc::all)]
 
-/// `PriorityResult` defines a cluster wide priority result of the Prioritiser protocol.
+/// PriorityResult defines a cluster wide priority result of the Prioritiser protocol.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PriorityResult {
     #[prost(message, repeated, tag = "1")]
@@ -12,7 +12,7 @@ pub struct PriorityResult {
     #[prost(message, repeated, tag = "2")]
     pub topics: ::prost::alloc::vec::Vec<PriorityTopicResult>,
 }
-/// `PriorityMsg` defines all the priorities and metadata of a single peer in the Prioritiser protocol.
+/// PriorityMsg defines all the priorities and metadata of a single peer in the Prioritiser protocol.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PriorityMsg {
     #[prost(message, optional, tag = "1")]
@@ -24,7 +24,7 @@ pub struct PriorityMsg {
     #[prost(bytes = "bytes", tag = "4")]
     pub signature: ::prost::bytes::Bytes,
 }
-/// `PriorityTopicProposal` defines a single peers proposed priorities for a single topic in the Prioritiser protocol.
+/// PriorityTopicProposal defines a single peers proposed priorities for a single topic in the Prioritiser protocol.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PriorityTopicProposal {
     #[prost(message, optional, tag = "1")]
@@ -32,7 +32,7 @@ pub struct PriorityTopicProposal {
     #[prost(message, repeated, tag = "2")]
     pub priorities: ::prost::alloc::vec::Vec<::prost_types::Any>,
 }
-/// `PriorityTopicResult` defines the cluster wide resulting priorities for a
+/// PriorityTopicResult defines the cluster wide resulting priorities for a
 /// single topic in the Prioritiser protocol.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PriorityTopicResult {
@@ -42,7 +42,7 @@ pub struct PriorityTopicResult {
     #[prost(message, repeated, tag = "2")]
     pub priorities: ::prost::alloc::vec::Vec<PriorityScoredResult>,
 }
-/// `PriorityScoredResult` defines the cluster wide priority score in the Prioritiser protocol.
+/// PriorityScoredResult defines the cluster wide priority score in the Prioritiser protocol.
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct PriorityScoredResult {
     #[prost(message, optional, tag = "1")]

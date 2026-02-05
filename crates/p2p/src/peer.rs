@@ -334,19 +334,19 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
+    #[ignore = "add this test after implementing p2p.NewNode function"]
     fn test_new_tcp_host() {
         todo!("add this test after implementing p2p.NewNode function");
     }
 
     #[test]
-    #[ignore]
+    #[ignore = "add this test after implementing cluster.NewForT function"]
     fn test_verify_p2p_key() {
         todo!("add this test after implementing cluster.NewForT function");
     }
 
     #[test]
-    #[ignore]
+    #[ignore = "add this test after implementing peer_id_key function"]
     fn test_peer_id_key() {
         todo!("add this test after implementing peer_id_key function");
     }
