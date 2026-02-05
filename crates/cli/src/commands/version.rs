@@ -13,8 +13,8 @@ pub struct VersionArgs {
 }
 
 /// Runs the version command.
-pub fn run(args: VersionArgs) -> Result<()> {
-    run_with_writer(args, &mut io::stdout())
+pub fn run(args: &VersionArgs) -> Result<()> {
+    run_with_writer(&args, &mut io::stdout())
 }
 
 /// Runs the version command with a custom writer (used for testing).
@@ -54,9 +54,9 @@ mod tests {
     #[test]
     fn test_run_version_cmd_default() {
         let mut buf = Vec::new();
-        let args = VersionArgs { verbose: false };
+        let args = &VersionArgs { verbose: false };
 
-        let result = run_with_writer(args, &mut buf);
+        let result = run_with_writer(&args, &mut buf);
         assert!(result.is_ok());
 
         let output = String::from_utf8(buf).expect("valid UTF-8 output");
@@ -102,7 +102,7 @@ mod tests {
         let mut buf = Vec::new();
         let args = VersionArgs { verbose: true };
 
-        let result = run_with_writer(args, &mut buf);
+        let result = run_with_writer(&args, &mut buf);
         assert!(result.is_ok());
 
         let output = String::from_utf8(buf).expect("valid UTF-8 output");

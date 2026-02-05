@@ -639,7 +639,7 @@ impl TryFrom<DefinitionV1x0or1> for Definition {
         };
 
         let validator_addresses =
-            repeat_v_addresses(validator_addresses, definition.num_validators);
+            repeat_v_addresses(&validator_addresses, definition.num_validators);
 
         Ok(Self {
             name: definition.name,
@@ -750,7 +750,7 @@ impl TryFrom<DefinitionV1x2or3> for Definition {
         };
 
         let validator_addresses =
-            repeat_v_addresses(validator_addresses, definition.num_validators);
+            repeat_v_addresses(&validator_addresses, definition.num_validators);
 
         Ok(Self {
             name: definition.name,
@@ -865,7 +865,7 @@ impl TryFrom<DefinitionV1x4> for Definition {
         };
 
         let validator_addresses =
-            repeat_v_addresses(validator_addresses, definition.num_validators);
+            repeat_v_addresses(&validator_addresses, definition.num_validators);
 
         Ok(Self {
             name: definition.name,

@@ -18,10 +18,10 @@ fn main() -> ExitResult {
 
     let result = match cli.command {
         Commands::Create(args) => match args.command {
-            CreateCommands::Enr(args) => commands::create_enr::run(args),
+            CreateCommands::Enr(args) => commands::create_enr::run(&args),
         },
-        Commands::Enr(args) => commands::enr::run(args),
-        Commands::Version(args) => commands::version::run(args),
+        Commands::Enr(args) => commands::enr::run(&args),
+        Commands::Version(args) => commands::version::run(&args),
     };
 
     ExitResult(result)
