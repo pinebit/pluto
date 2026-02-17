@@ -28,6 +28,7 @@
 	},
 	"postCreateCommand": {
 		"own-workspaces": "sudo chown ${localEnv:USERNAME}:${localEnv:USERNAME} /workspaces/",
-		"bashrc-customization": "(cat .bashrc || echo '') >> ~/.bashrc"
+		"bashrc-customization": "(cat .bashrc || echo '') >> ~/.bashrc",
+		"setup-githooks": "chmod +x .githooks/* && git config --local core.hooksPath .githooks/"
 	}
 }
