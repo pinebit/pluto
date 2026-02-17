@@ -32,3 +32,5 @@ ENV PATH="/home/${USERNAME}/.cargo/bin:${PATH}"
 
 # Install Rust dependencies
 RUN cargo install oas3-gen@0.24.0
+RUN cargo install cargo-llvm-cov@0.6.24
+RUN cargo install cargo-deny@0.19.0
