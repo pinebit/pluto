@@ -8,7 +8,8 @@ ARG USER_GID
 RUN apt-get update && apt-get install -y \
   sudo \
   curl \
-  git
+  git \
+  gh
 
 RUN userdel -r $(getent passwd ${USER_UID} | cut -d: -f1) 2>/dev/null || true
 
