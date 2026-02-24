@@ -5514,9 +5514,12 @@ version = "1.7.1"
 dependencies = [
  "blst",
  "hex",
+ "pluto-core",
+ "pluto-eth2api",
  "rand 0.8.5",
  "rand_core 0.6.4",
  "serde",
+ "test-case",
  "thiserror 2.0.18",
 ]
 
