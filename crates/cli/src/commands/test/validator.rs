@@ -145,9 +145,9 @@ async fn run_tests_with_timeout(
     let mut test_iter = tests.iter().peekable();
 
     let timeout_result = tokio::time::timeout(args.test_config.timeout, async {
-        while let Some(&test_case) = test_iter.next() {
+        for &test_case in test_iter.by_ref() {
             let result = run_single_test(args, test_case).await;
-            let _ = tx.send(result);
+            let _ = tx.send(result).await;
         }
     })
     .await;
@@ -159,13 +159,13 @@ async fn run_tests_with_timeout(
         results.push(result);
     }
 
-    if timeout_result.is_err() {
-        if let Some(&interrupted_test) = test_iter.peek() {
-            results.push(
-                TestResult::new(interrupted_test.name())
-                    .fail(std::io::Error::other(ERR_TIMEOUT_INTERRUPTED)),
-            );
-        }
+    if timeout_result.is_err()
+        && let Some(&interrupted_test) = test_iter.peek()
+    {
+        results.push(
+            TestResult::new(interrupted_test.name())
+                .fail(std::io::Error::other(ERR_TIMEOUT_INTERRUPTED)),
+        );
     }
 
     results
