@@ -1,18 +1,19 @@
 //! Validator client connectivity tests.
 
-use std::{collections::HashMap, io::Write, sync::mpsc, time::Duration};
+use std::{io::Write, time::Duration};
 
 use clap::Args;
 use rand::Rng;
 use tokio::{
     net::TcpStream,
+    sync::mpsc,
     time::{Instant, timeout},
 };
 
 use super::{
-    AllCategoriesResult, TestCaseName, TestCategory, TestCategoryResult, TestConfigArgs,
-    TestResult, TestVerdict, calculate_score, evaluate_highest_rtt, evaluate_rtt, filter_tests,
-    publish_result_to_obol_api, sort_tests, write_result_to_file, write_result_to_writer,
+    AllCategoriesResult, TestCategory, TestCategoryResult, TestConfigArgs, TestResult, TestVerdict,
+    calculate_score, evaluate_highest_rtt, evaluate_rtt, publish_result_to_obol_api,
+    write_result_to_file, write_result_to_writer,
 };
 use crate::{duration::Duration as CliDuration, error::Result};
 
@@ -21,6 +22,34 @@ const THRESHOLD_MEASURE_AVG: Duration = Duration::from_millis(50);
 const THRESHOLD_MEASURE_POOR: Duration = Duration::from_millis(240);
 const THRESHOLD_LOAD_AVG: Duration = Duration::from_millis(50);
 const THRESHOLD_LOAD_POOR: Duration = Duration::from_millis(240);
+
+/// Validator test cases.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ValidatorTestCase {
+    Ping,
+    PingMeasure,
+    PingLoad,
+}
+
+impl ValidatorTestCase {
+    /// Returns all validator test cases.
+    pub fn all() -> &'static [ValidatorTestCase] {
+        &[
+            ValidatorTestCase::Ping,
+            ValidatorTestCase::PingMeasure,
+            ValidatorTestCase::PingLoad,
+        ]
+    }
+
+    /// Returns the test name as a string.
+    pub fn name(&self) -> &'static str {
+        match self {
+            ValidatorTestCase::Ping => "Ping",
+            ValidatorTestCase::PingMeasure => "PingMeasure",
+            ValidatorTestCase::PingLoad => "PingLoad",
+        }
+    }
+}
 
 /// Arguments for the validator test command.
 #[derive(Args, Clone, Debug)]
@@ -53,12 +82,16 @@ pub async fn run(args: TestValidatorArgs, writer: &mut dyn Write) -> Result<Test
     let start_time = Instant::now();
 
     // Get and filter test cases
-    let all_test_cases = HashMap::from([
-        (TestCaseName::new("Ping", 1), ()),
-        (TestCaseName::new("PingMeasure", 2), ()),
-        (TestCaseName::new("PingLoad", 3), ()),
-    ]);
-    let mut queued_tests = filter_tests(&all_test_cases, args.test_config.test_cases.as_deref());
+    let queued_tests: Vec<ValidatorTestCase> = if let Some(ref filter) = args.test_config.test_cases
+    {
+        ValidatorTestCase::all()
+            .iter()
+            .filter(|tc| filter.contains(&tc.name().to_string()))
+            .copied()
+            .collect()
+    } else {
+        ValidatorTestCase::all().to_vec()
+    };
 
     if queued_tests.is_empty() {
         return Err(crate::error::CliError::Other(
@@ -66,26 +99,9 @@ pub async fn run(args: TestValidatorArgs, writer: &mut dyn Write) -> Result<Test
         ));
     }
 
-    sort_tests(&mut queued_tests);
-
     // Run tests with timeout
-    let test_results = tokio::time::timeout(args.test_config.timeout, async {
-        let mut results = Vec::new();
-        for test in queued_tests.iter() {
-            let result = match test.name.as_str() {
-                "Ping" => ping_test(&args).await,
-                "PingMeasure" => ping_measure_test(&args).await,
-                "PingLoad" => ping_load_test(&args).await,
-                _ => TestResult::new(&test.name).fail(std::io::Error::other("unknown test")),
-            };
-            results.push(result);
-        }
-        results
-    })
-    .await
-    .unwrap_or_else(|_| {
-        vec![TestResult::new("Timeout").fail(std::io::Error::other("timeout interrupted"))]
-    });
+    let test_results = run_tests_with_timeout(&args, &queued_tests).await;
+
     let score = calculate_score(&test_results);
 
     let mut res = TestCategoryResult::new(TestCategory::Validator);
@@ -117,8 +133,55 @@ pub async fn run(args: TestValidatorArgs, writer: &mut dyn Write) -> Result<Test
     Ok(res)
 }
 
+/// Timeout error message
+const ERR_TIMEOUT_INTERRUPTED: &str = "timeout";
+
+/// Runs tests with timeout, keeping completed tests on timeout.
+async fn run_tests_with_timeout(
+    args: &TestValidatorArgs,
+    tests: &[ValidatorTestCase],
+) -> Vec<TestResult> {
+    let (tx, mut rx) = mpsc::channel::<TestResult>(100);
+    let mut test_iter = tests.iter().peekable();
+
+    let timeout_result = tokio::time::timeout(args.test_config.timeout, async {
+        while let Some(&test_case) = test_iter.next() {
+            let result = run_single_test(args, test_case).await;
+            let _ = tx.send(result);
+        }
+    })
+    .await;
+
+    // Collect all completed results
+    drop(tx);
+    let mut results = Vec::new();
+    while let Ok(result) = rx.try_recv() {
+        results.push(result);
+    }
+
+    if timeout_result.is_err() {
+        if let Some(&interrupted_test) = test_iter.peek() {
+            results.push(
+                TestResult::new(interrupted_test.name())
+                    .fail(std::io::Error::other(ERR_TIMEOUT_INTERRUPTED)),
+            );
+        }
+    }
+
+    results
+}
+
+/// Runs a single test case.
+async fn run_single_test(args: &TestValidatorArgs, test_case: ValidatorTestCase) -> TestResult {
+    match test_case {
+        ValidatorTestCase::Ping => ping_test(args).await,
+        ValidatorTestCase::PingMeasure => ping_measure_test(args).await,
+        ValidatorTestCase::PingLoad => ping_load_test(args).await,
+    }
+}
+
 async fn ping_test(args: &TestValidatorArgs) -> TestResult {
-    let mut result = TestResult::new("Ping");
+    let mut result = TestResult::new(ValidatorTestCase::Ping.name());
 
     match timeout(
         Duration::from_secs(1),
@@ -144,7 +207,7 @@ async fn ping_test(args: &TestValidatorArgs) -> TestResult {
 }
 
 async fn ping_measure_test(args: &TestValidatorArgs) -> TestResult {
-    let mut result = TestResult::new("PingMeasure");
+    let mut result = TestResult::new(ValidatorTestCase::PingMeasure.name());
     let before = Instant::now();
 
     match timeout(
@@ -178,9 +241,9 @@ async fn ping_load_test(args: &TestValidatorArgs) -> TestResult {
         "Running ping load tests..."
     );
 
-    let mut result = TestResult::new("PingLoad");
+    let mut result = TestResult::new(ValidatorTestCase::PingLoad.name());
 
-    let (tx, rx) = mpsc::channel::<Duration>();
+    let (tx, mut rx) = mpsc::channel::<Duration>(100);
     let address = args.api_address.clone();
     let duration = args.load_test_duration;
 
@@ -188,6 +251,7 @@ async fn ping_load_test(args: &TestValidatorArgs) -> TestResult {
         let start = Instant::now();
         let mut interval = tokio::time::interval(Duration::from_secs(1));
 
+        interval.tick().await;
         while start.elapsed() < duration {
             interval.tick().await;
 
@@ -222,15 +286,20 @@ async fn ping_continuously(address: String, tx: mpsc::Sender<Duration>, max_dura
         let before = Instant::now();
 
         match timeout(Duration::from_secs(1), TcpStream::connect(&address)).await {
-            Ok(Ok(_conn)) => {
+            Ok(Ok(conn)) => {
                 let rtt = before.elapsed();
-                if tx.send(rtt).is_err() {
+                if tx.send(rtt).await.is_err() {
+                    drop(conn);
                     return;
                 }
             }
-            _ => return,
+            Ok(Err(e)) => {
+                tracing::warn!(target = %address, error = ?e, "Ping connection attempt failed during load test");
+            }
+            Err(e) => {
+                tracing::warn!(target = %address, error = ?e, "Ping connection attempt timed out during load test");
+            }
         }
-
         let sleep_ms = rand::thread_rng().gen_range(0..100);
         tokio::time::sleep(Duration::from_millis(sleep_ms)).await;
     }
