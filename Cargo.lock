@@ -5613,6 +5613,7 @@ version = "1.7.1"
 dependencies = [
  "anyhow",
  "axum",
+ "backon",
  "chrono",
  "clap",
  "either",
@@ -5625,6 +5626,7 @@ dependencies = [
  "pluto-testutil",
  "pluto-tracing",
  "rand 0.8.5",
+ "reqwest 0.13.2",
  "serde",
  "serde_json",
  "tempfile",
@@ -5632,6 +5634,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+ "url",
  "vise",
  "vise-exporter",
 ]

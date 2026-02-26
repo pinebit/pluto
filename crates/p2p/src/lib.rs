@@ -5,6 +5,9 @@
 //! and communication mechanisms for validator nodes to coordinate and exchange
 //! information.
 
+/// Bootnode and relay resolution.
+pub mod bootnode;
+
 /// Peer-related types and utilities.
 pub mod peer;
 

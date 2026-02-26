@@ -2,10 +2,13 @@
 //!
 //! Peer-related types and utilities.
 
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 use k256::{PublicKey as K256PublicKey, SecretKey};
-use libp2p::{Multiaddr, PeerId, identity::PublicKey as Libp2pPublicKey};
+use libp2p::{Multiaddr, PeerId, identity::PublicKey as Libp2pPublicKey, multiaddr::Protocol};
 use pluto_eth2util::enr::Record;
 
 use crate::name::peer_name;
@@ -42,6 +45,10 @@ pub enum PeerError {
         "Unknown private key provided, it doesn't match any public key encoded inside the operator ENRs"
     )]
     UnknownPublicKey,
+
+    /// Missing peer ID in multiaddr.
+    #[error("Missing peer ID in multiaddr")]
+    MissingPeerIdInMultiaddr,
 }
 
 type Result<T> = std::result::Result<T, PeerError>;
@@ -155,6 +162,17 @@ impl std::fmt::Debug for MutablePeerInner {
 
 type MutablePeerResult<T> = std::result::Result<T, MutablePeerError>;
 
+impl Default for MutablePeer {
+    fn default() -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(MutablePeerInner {
+                peer: None,
+                subs: Vec::new(),
+            })),
+        }
+    }
+}
+
 impl MutablePeer {
     /// Creates a new mutable peer with an initial value.
     pub fn new(peer: Peer) -> Self {
@@ -238,6 +256,38 @@ pub fn verify_p2p_key(peers: &[Peer], key: &SecretKey) -> Result<()> {
     }
 
     Err(PeerError::UnknownPublicKey)
+}
+
+/// Extracts AddrInfo from a list of P2P multiaddrs.
+///
+/// Groups addresses by peer ID (extracted from the /p2p/ component).
+/// Returns an error if any address is missing a /p2p/<peer_id> component.
+pub fn addr_infos_from_p2p_addrs(addrs: &[Multiaddr]) -> Result<Vec<AddrInfo>> {
+    let mut peer_map: HashMap<PeerId, Vec<Multiaddr>> = HashMap::new();
+
+    for addr in addrs {
+        // Extract PeerId from the /p2p/<peer_id> component
+        let peer_id = addr
+            .iter()
+            .find_map(|p| match p {
+                Protocol::P2p(peer_id) => Some(peer_id),
+                _ => None,
+            })
+            .ok_or(PeerError::MissingPeerIdInMultiaddr)?;
+
+        // Strip the /p2p component to get transport address
+        let transport_addr: Multiaddr = addr
+            .iter()
+            .filter(|p| !matches!(p, Protocol::P2p(_)))
+            .collect();
+
+        peer_map.entry(peer_id).or_default().push(transport_addr);
+    }
+
+    Ok(peer_map
+        .into_iter()
+        .map(|(id, addrs)| AddrInfo { id, addrs })
+        .collect())
 }
 
 #[cfg(test)]
