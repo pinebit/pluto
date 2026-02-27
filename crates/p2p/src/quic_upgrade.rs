@@ -41,8 +41,9 @@ struct QuicUpgradeBackoff {
 }
 
 impl QuicUpgradeBackoff {
-    /// Initial backoff duration (2 minutes).
-    const INITIAL: u32 = 2;
+    /// Initial backoff duration (1 minute, becomes 2 minutes after first
+    /// failure).
+    const INITIAL: u32 = 1;
     /// Maximum backoff duration (512 minutes / ~8 hours).
     const MAX: u32 = 512;
 
@@ -410,7 +411,7 @@ impl NetworkBehaviour for QuicUpgradeBehaviour {
 
     fn poll(
         &mut self,
-        cx: &mut Context<'_>,
+        _cx: &mut Context<'_>,
     ) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
         if let Some(event) = self.pending_events.pop_front() {
             return Poll::Ready(event);
@@ -426,8 +427,6 @@ impl NetworkBehaviour for QuicUpgradeBehaviour {
             }
         }
 
-        // Wake to check timer
-        cx.waker().wake_by_ref();
         Poll::Pending
     }
 }
