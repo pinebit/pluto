@@ -35,6 +35,8 @@ pluto-testutil.workspace = true
 vise-exporter.workspace = true
 anyhow.workspace = true
 clap.workspace = true
+pluto-cluster.workspace = true
+hex.workspace = true
 
 [lints]
 workspace = true

@@ -44,16 +44,6 @@ pub async fn run_relay_p2p_node(
     info!("Charon relay starting");
 
     // todo: monitor connections
-
-    for tcp_addr in config.p2p_config.tcp_addrs.iter() {
-        debug!("Listening on TCP address {}", tcp_addr);
-        node.listen_on(tcp_addr.parse()?)?;
-    }
-    for udp_addr in config.p2p_config.udp_addrs.iter() {
-        debug!("Listening on UDP address {}", udp_addr);
-        node.listen_on(udp_addr.parse()?)?;
-    }
-
     let (server_errors, mut server_errors_receiver) = mpsc::channel(3);
 
     let listeners = Arc::new(RwLock::new(Vec::new()));

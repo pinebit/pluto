@@ -1,8 +1,6 @@
 #![allow(missing_docs)]
-use std::str::FromStr;
 
 use k256::SecretKey;
-use libp2p::multiaddr;
 use pluto_p2p::config::P2PConfig;
 use pluto_relay_server::{config::Config, p2p::run_relay_p2p_node};
 use pluto_tracing::TracingConfig;
@@ -18,9 +16,7 @@ async fn main() {
         .p2p_config(
             P2PConfig::builder()
                 .with_tcp_addrs(vec![
-                    multiaddr::Multiaddr::from_str("/ip4/0.0.0.0/tcp/0")
-                        .expect("Failed to parse multiaddress")
-                        .to_string(),
+                    "127.0.0.1:9999".to_string(),
                 ])
                 .build(),
         )
