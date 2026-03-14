@@ -16,9 +16,6 @@ pub mod retry;
 /// Deadline
 pub mod deadline;
 
-/// Ethereum EL RPC client management.
-pub mod eth1wrap;
-
 /// Featureset defines a set of global features and their rollout status.
 pub mod featureset;
 
@@ -27,3 +24,9 @@ pub mod obolapi;
 
 /// Ethereum CL RPC client management.
 pub mod eth2wrap;
+
+/// Private key locking service.
+pub mod privkeylock;
+
+/// Utility helpers for archiving, extracting, and comparing files/directories.
+pub mod utils;
