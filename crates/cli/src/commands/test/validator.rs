@@ -141,31 +141,24 @@ async fn run_tests_with_timeout(
     args: &TestValidatorArgs,
     tests: &[ValidatorTestCase],
 ) -> Vec<TestResult> {
-    let (tx, mut rx) = mpsc::channel::<TestResult>(100);
-    let mut test_iter = tests.iter().peekable();
-
-    let timeout_result = tokio::time::timeout(args.test_config.timeout, async {
-        for &test_case in test_iter.by_ref() {
-            let result = run_single_test(args, test_case).await;
-            let _ = tx.send(result).await;
-        }
-    })
-    .await;
-
-    // Collect all completed results
-    drop(tx);
     let mut results = Vec::new();
-    while let Ok(result) = rx.try_recv() {
-        results.push(result);
-    }
+    let timeout_deadline = tokio::time::Instant::now()
+        .checked_add(args.test_config.timeout)
+        .expect("timeout overflow");
 
-    if timeout_result.is_err()
-        && let Some(&interrupted_test) = test_iter.peek()
-    {
-        results.push(
-            TestResult::new(interrupted_test.name())
-                .fail(std::io::Error::other(ERR_TIMEOUT_INTERRUPTED)),
-        );
+    for &test_case in tests {
+        let remaining = timeout_deadline.saturating_duration_since(tokio::time::Instant::now());
+
+        match tokio::time::timeout(remaining, run_single_test(args, test_case)).await {
+            Ok(result) => results.push(result),
+            Err(_) => {
+                results.push(
+                    TestResult::new(test_case.name())
+                        .fail(std::io::Error::other(ERR_TIMEOUT_INTERRUPTED)),
+                );
+                break;
+            }
+        }
     }
 
     results
@@ -243,13 +236,14 @@ async fn ping_load_test(args: &TestValidatorArgs) -> TestResult {
 
     let mut result = TestResult::new(ValidatorTestCase::PingLoad.name());
 
-    let (tx, mut rx) = mpsc::channel::<Duration>(100);
+    let (tx, mut rx) = mpsc::channel::<Duration>(i16::MAX as usize);
     let address = args.api_address.clone();
     let duration = args.load_test_duration;
 
     let handle = tokio::spawn(async move {
         let start = Instant::now();
         let mut interval = tokio::time::interval(Duration::from_secs(1));
+        let mut workers = tokio::task::JoinSet::new();
 
         interval.tick().await;
         while start.elapsed() < duration {
@@ -259,16 +253,24 @@ async fn ping_load_test(args: &TestValidatorArgs) -> TestResult {
             let addr = address.clone();
             let remaining = duration.saturating_sub(start.elapsed());
 
-            tokio::spawn(async move {
+            workers.spawn(async move {
                 ping_continuously(addr, tx, remaining).await;
             });
         }
+
+        // Drop the scheduler's clone so only workers hold senders
+        drop(tx);
+
+        // Wait for all spawned ping workers to finish
+        while workers.join_next().await.is_some() {}
     });
 
     let _ = handle.await;
 
+    // All senders dropped, collect all RTTs
+    rx.close();
     let mut rtts = Vec::new();
-    while let Ok(rtt) = rx.try_recv() {
+    while let Some(rtt) = rx.recv().await {
         rtts.push(rtt);
     }
 
