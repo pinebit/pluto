@@ -1,7 +1,6 @@
 use crate::types::{Duty, DutyType};
 use chrono::{DateTime, Utc};
 use pluto_eth2api::EthBeaconNodeApiClientError;
-use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 
 /// Fraction of slot duration to use as a margin for network delays.
@@ -12,7 +11,7 @@ const MARGIN_FACTOR: i32 = 12;
 /// Takes a duty and returns an optional deadline.
 /// Returns `Ok(Some(deadline))` if the duty expires at the given time.
 /// Returns `Ok(None)` if the duty never expires.
-pub type DeadlineFunc = Arc<dyn Fn(&Duty) -> Result<Option<DateTime<Utc>>> + Send + Sync>;
+pub type DeadlineFunc = Box<dyn Fn(&Duty) -> Result<Option<DateTime<Utc>>> + Send + Sync>;
 
 /// Error types for deadline operations.
 #[derive(Debug, thiserror::Error)]
@@ -58,7 +57,7 @@ pub async fn new_duty_deadline_func(
     let slot_duration =
         chrono::Duration::from_std(slot_duration).map_err(|_| DeadlineError::DurationConversion)?;
 
-    Ok(Arc::new(move |duty: &Duty| {
+    Ok(Box::new(move |duty: &Duty| {
         // Exit and BuilderRegistration duties never expire
         match duty.duty_type {
             DutyType::Exit | DutyType::BuilderRegistration => {
