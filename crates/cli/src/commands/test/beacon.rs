@@ -237,7 +237,7 @@ fn supported_beacon_test_cases() -> Vec<TestCaseName> {
 async fn run_test_case(
     cancel: tokio_util::sync::CancellationToken,
     cfg: TestBeaconArgs,
-    target: String,
+    target: &str,
     name: &str,
 ) -> TestResult {
     match name {
@@ -372,7 +372,7 @@ async fn test_single_beacon(
             break;
         }
 
-        let result = run_test_case(cancel.clone(), cfg.clone(), target.to_string(), &tc.name).await;
+        let result = run_test_case(cancel.clone(), cfg.clone(), target, &tc.name).await;
         results.push(result);
     }
 
@@ -382,7 +382,7 @@ async fn test_single_beacon(
 async fn beacon_ping_test(
     _cancel: tokio_util::sync::CancellationToken,
     _cfg: TestBeaconArgs,
-    target: String,
+    target: &str,
 ) -> TestResult {
     let mut res = TestResult::new("Ping");
     let url = format!("{target}/eth/v1/node/health");
@@ -399,11 +399,11 @@ async fn beacon_ping_test(
 async fn beacon_ping_measure_test(
     _cancel: tokio_util::sync::CancellationToken,
     _cfg: TestBeaconArgs,
-    target: String,
+    target: &str,
 ) -> TestResult {
     let res = TestResult::new("PingMeasure");
 
-    match beacon_ping_once(&target).await {
+    match beacon_ping_once(target).await {
         Ok(rtt) => evaluate_rtt(
             rtt,
             res,
@@ -417,7 +417,7 @@ async fn beacon_ping_measure_test(
 async fn beacon_version_test(
     _cancel: tokio_util::sync::CancellationToken,
     _cfg: TestBeaconArgs,
-    target: String,
+    target: &str,
 ) -> TestResult {
     let mut res = TestResult::new("Version");
     let url = format!("{target}/eth/v1/node/version");
@@ -472,7 +472,7 @@ async fn beacon_version_test(
 async fn beacon_is_synced_test(
     _cancel: tokio_util::sync::CancellationToken,
     _cfg: TestBeaconArgs,
-    target: String,
+    target: &str,
 ) -> TestResult {
     let mut res = TestResult::new("Synced");
     let url = format!("{target}/eth/v1/node/syncing");
@@ -522,7 +522,7 @@ async fn beacon_is_synced_test(
 async fn beacon_peer_count_test(
     _cancel: tokio_util::sync::CancellationToken,
     _cfg: TestBeaconArgs,
-    target: String,
+    target: &str,
 ) -> TestResult {
     let mut res = TestResult::new("PeerCount");
     let url = format!("{target}/eth/v1/node/peers?state=connected");
@@ -605,7 +605,7 @@ async fn ping_beacon_continuously(
 async fn beacon_ping_load_test(
     cancel: tokio_util::sync::CancellationToken,
     cfg: TestBeaconArgs,
-    target: String,
+    target: &str,
 ) -> TestResult {
     if !cfg.load_test {
         return skip_result("PingLoad");
@@ -631,7 +631,7 @@ async fn beacon_ping_load_test(
             _ = load_cancel.cancelled() => break,
             _ = interval.tick() => {
                 let c = load_cancel.clone();
-                let t = target.clone();
+                let t = target.to_string();
                 let tx = tx.clone();
                 handles.push(tokio::spawn(async move {
                     ping_beacon_continuously(c, t, tx).await;
@@ -674,7 +674,7 @@ fn default_intensity() -> RequestsIntensity {
 async fn beacon_simulation_1_test(
     cancel: tokio_util::sync::CancellationToken,
     cfg: TestBeaconArgs,
-    target: String,
+    target: &str,
 ) -> TestResult {
     if !cfg.load_test {
         return skip_result("Simulate1");
@@ -687,13 +687,13 @@ async fn beacon_simulation_1_test(
         sync_committee_validators_count: 1,
         request_intensity: default_intensity(),
     };
-    beacon_simulation_test(cancel, &cfg, &target, res, params).await
+    beacon_simulation_test(cancel, &cfg, target, res, params).await
 }
 
 async fn beacon_simulation_10_test(
     cancel: tokio_util::sync::CancellationToken,
     cfg: TestBeaconArgs,
-    target: String,
+    target: &str,
 ) -> TestResult {
     if !cfg.load_test {
         return skip_result("Simulate10");
@@ -706,13 +706,13 @@ async fn beacon_simulation_10_test(
         sync_committee_validators_count: 1,
         request_intensity: default_intensity(),
     };
-    beacon_simulation_test(cancel, &cfg, &target, res, params).await
+    beacon_simulation_test(cancel, &cfg, target, res, params).await
 }
 
 async fn beacon_simulation_100_test(
     cancel: tokio_util::sync::CancellationToken,
     cfg: TestBeaconArgs,
-    target: String,
+    target: &str,
 ) -> TestResult {
     if !cfg.load_test {
         return skip_result("Simulate100");
@@ -725,13 +725,13 @@ async fn beacon_simulation_100_test(
         sync_committee_validators_count: 2,
         request_intensity: default_intensity(),
     };
-    beacon_simulation_test(cancel, &cfg, &target, res, params).await
+    beacon_simulation_test(cancel, &cfg, target, res, params).await
 }
 
 async fn beacon_simulation_500_test(
     cancel: tokio_util::sync::CancellationToken,
     cfg: TestBeaconArgs,
-    target: String,
+    target: &str,
 ) -> TestResult {
     if !cfg.load_test {
         return skip_result("Simulate500");
@@ -744,13 +744,13 @@ async fn beacon_simulation_500_test(
         sync_committee_validators_count: 5,
         request_intensity: default_intensity(),
     };
-    beacon_simulation_test(cancel, &cfg, &target, res, params).await
+    beacon_simulation_test(cancel, &cfg, target, res, params).await
 }
 
 async fn beacon_simulation_1000_test(
     cancel: tokio_util::sync::CancellationToken,
     cfg: TestBeaconArgs,
-    target: String,
+    target: &str,
 ) -> TestResult {
     if !cfg.load_test {
         return skip_result("Simulate1000");
@@ -763,13 +763,13 @@ async fn beacon_simulation_1000_test(
         sync_committee_validators_count: 5,
         request_intensity: default_intensity(),
     };
-    beacon_simulation_test(cancel, &cfg, &target, res, params).await
+    beacon_simulation_test(cancel, &cfg, target, res, params).await
 }
 
 async fn beacon_simulation_custom_test(
     cancel: tokio_util::sync::CancellationToken,
     cfg: TestBeaconArgs,
-    target: String,
+    target: &str,
 ) -> TestResult {
     if cfg.simulation_custom < 1 {
         return TestResult {
@@ -799,7 +799,7 @@ async fn beacon_simulation_custom_test(
         sync_committee_validators_count: sync_committees,
         request_intensity: default_intensity(),
     };
-    beacon_simulation_test(cancel, &cfg, &target, res, params).await
+    beacon_simulation_test(cancel, &cfg, target, res, params).await
 }
 
 async fn beacon_simulation_test(
