@@ -47,7 +47,8 @@ pub struct TestBeaconArgs {
     )]
     pub endpoints: Vec<String>,
 
-    /// Enable load test, not advisable when testing towards external beacon nodes.
+    /// Enable load test, not advisable when testing towards external beacon
+    /// nodes.
     #[arg(long = "load-test", help = "Enable load test.")]
     pub load_test: bool,
 
