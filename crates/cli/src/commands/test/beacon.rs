@@ -3,6 +3,8 @@
 //! Port of charon/cmd/testbeacon.go — runs connectivity, load, and simulation
 //! tests against one or more beacon node endpoints.
 
+#![allow(clippy::arithmetic_side_effects, clippy::cast_possible_truncation)]
+
 use super::{
     CategoryScore, EPOCH_TIME, SLOT_TIME, SLOTS_IN_EPOCH, TestCaseName, TestCategory,
     TestCategoryResult, TestConfigArgs, TestResult, TestVerdict, apply_basic_auth, calculate_score,
@@ -282,12 +284,7 @@ pub async fn run(args: TestBeaconArgs, writer: &mut dyn Write) -> CliResult<Test
     sort_tests(&mut queued);
 
     let cancel = tokio_util::sync::CancellationToken::new();
-    let timeout_cancel = cancel.clone();
-    let timeout = args.test_config.timeout;
-    tokio::spawn(async move {
-        tokio::time::sleep(timeout).await;
-        timeout_cancel.cancel();
-    });
+    cancel_after(&cancel, args.test_config.timeout);
 
     let start = std::time::Instant::now();
 
@@ -624,12 +621,7 @@ async fn beacon_ping_load_test(
     let (tx, mut rx) = mpsc::channel::<StdDuration>(65536);
 
     let load_cancel = cancel.child_token();
-    let timeout_cancel = load_cancel.clone();
-    let duration = cfg.load_test_duration;
-    tokio::spawn(async move {
-        tokio::time::sleep(duration).await;
-        timeout_cancel.cancel();
-    });
+    cancel_after(&load_cancel, cfg.load_test_duration);
 
     let mut handles = Vec::new();
     let mut interval = tokio::time::interval(StdDuration::from_secs(1));
@@ -844,11 +836,7 @@ async fn beacon_simulation_test(
     );
 
     let sim_cancel = cancel.child_token();
-    let timeout_cancel = sim_cancel.clone();
-    tokio::spawn(async move {
-        tokio::time::sleep(sim_duration).await;
-        timeout_cancel.cancel();
-    });
+    cancel_after(&sim_cancel, sim_duration);
 
     // General cluster requests
     let cluster_cancel = sim_cancel.clone();
@@ -1028,8 +1016,10 @@ async fn single_cluster_simulation(
                 }
 
                 // Last-but-one slot of epoch
-                if slot % SLOTS_IN_EPOCH == SLOTS_IN_EPOCH - 2 {
-                    if let Ok(rtt) = req_get_attester_duties_for_epoch(target, epoch).await { duties_attester.push(rtt); }
+                if slot % SLOTS_IN_EPOCH == SLOTS_IN_EPOCH - 2
+                    && let Ok(rtt) = req_get_attester_duties_for_epoch(target, epoch).await
+                {
+                    duties_attester.push(rtt);
                 }
 
                 // Last slot of epoch
@@ -1232,74 +1222,45 @@ async fn single_validator_simulation(
     let mut all_requests = Vec::new();
 
     // Attestation results
-    let attestation_result = if duties.attestation {
-        let get_vals = generate_simulation_values(
-            &get_attestation_data_all,
-            "GET /eth/v1/validator/attestation_data",
-        );
-        let post_vals = generate_simulation_values(
-            &submit_attestation_object_all,
-            "POST /eth/v1/beacon/pool/attestations",
-        );
-        let cumulative: Vec<_> = get_attestation_data_all
-            .iter()
-            .zip(&submit_attestation_object_all)
-            .map(|(a, b)| *a + *b)
-            .collect();
-        all_requests.extend_from_slice(&cumulative);
-        SimulationAttestation {
-            values: generate_simulation_values(&cumulative, ""),
-            get_attestation_data_request: get_vals,
-            post_attestations_request: post_vals,
-        }
-    } else {
-        SimulationAttestation::default()
+    let (values, get_vals, post_vals) = compute_two_phase_results(
+        &get_attestation_data_all,
+        "GET /eth/v1/validator/attestation_data",
+        &submit_attestation_object_all,
+        "POST /eth/v1/beacon/pool/attestations",
+        &mut all_requests,
+    );
+    let attestation_result = SimulationAttestation {
+        values,
+        get_attestation_data_request: get_vals,
+        post_attestations_request: post_vals,
     };
 
     // Aggregation results
-    let aggregation_result = if duties.aggregation {
-        let get_vals = generate_simulation_values(
-            &get_aggregate_attestations_all,
-            "GET /eth/v1/validator/aggregate_attestation",
-        );
-        let post_vals = generate_simulation_values(
-            &submit_aggregate_and_proofs_all,
-            "POST /eth/v1/validator/aggregate_and_proofs",
-        );
-        let cumulative: Vec<_> = get_aggregate_attestations_all
-            .iter()
-            .zip(&submit_aggregate_and_proofs_all)
-            .map(|(a, b)| *a + *b)
-            .collect();
-        all_requests.extend_from_slice(&cumulative);
-        SimulationAggregation {
-            values: generate_simulation_values(&cumulative, ""),
-            get_aggregate_attestation_request: get_vals,
-            post_aggregate_and_proofs_request: post_vals,
-        }
-    } else {
-        SimulationAggregation::default()
+    let (values, get_vals, post_vals) = compute_two_phase_results(
+        &get_aggregate_attestations_all,
+        "GET /eth/v1/validator/aggregate_attestation",
+        &submit_aggregate_and_proofs_all,
+        "POST /eth/v1/validator/aggregate_and_proofs",
+        &mut all_requests,
+    );
+    let aggregation_result = SimulationAggregation {
+        values,
+        get_aggregate_attestation_request: get_vals,
+        post_aggregate_and_proofs_request: post_vals,
     };
 
     // Proposal results
-    let proposal_result = if duties.proposal {
-        let produce_vals =
-            generate_simulation_values(&produce_block_all, "GET /eth/v3/validator/blocks/{SLOT}");
-        let publish_vals =
-            generate_simulation_values(&publish_blinded_block_all, "POST /eth/v2/beacon/blinded");
-        let cumulative: Vec<_> = produce_block_all
-            .iter()
-            .zip(&publish_blinded_block_all)
-            .map(|(a, b)| *a + *b)
-            .collect();
-        all_requests.extend_from_slice(&cumulative);
-        SimulationProposal {
-            values: generate_simulation_values(&cumulative, ""),
-            produce_block_request: produce_vals,
-            publish_blinded_block_request: publish_vals,
-        }
-    } else {
-        SimulationProposal::default()
+    let (values, produce_vals, publish_vals) = compute_two_phase_results(
+        &produce_block_all,
+        "GET /eth/v3/validator/blocks/{SLOT}",
+        &publish_blinded_block_all,
+        "POST /eth/v2/beacon/blinded",
+        &mut all_requests,
+    );
+    let proposal_result = SimulationProposal {
+        values,
+        produce_block_request: produce_vals,
+        publish_blinded_block_request: publish_vals,
     };
 
     // Sync committee results
@@ -1474,6 +1435,7 @@ async fn proposal_duty(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn sync_committee_duties(
     cancel: tokio_util::sync::CancellationToken,
     target: &str,
@@ -1627,6 +1589,21 @@ async fn get_current_slot(target: &str) -> CliResult<u64> {
         .map_err(|e| crate::error::CliError::Other(format!("parse head_slot: {e}")))
 }
 
+fn compute_two_phase_results(
+    first: &[StdDuration],
+    first_endpoint: &str,
+    second: &[StdDuration],
+    second_endpoint: &str,
+    all_requests: &mut Vec<StdDuration>,
+) -> (SimulationValues, SimulationValues, SimulationValues) {
+    let first_vals = generate_simulation_values(first, first_endpoint);
+    let second_vals = generate_simulation_values(second, second_endpoint);
+    let cumulative: Vec<_> = first.iter().zip(second).map(|(a, b)| *a + *b).collect();
+    all_requests.extend_from_slice(&cumulative);
+    let cumulative_vals = generate_simulation_values(&cumulative, "");
+    (cumulative_vals, first_vals, second_vals)
+}
+
 fn generate_simulation_values(durations: &[StdDuration], endpoint: &str) -> SimulationValues {
     if durations.is_empty() {
         return SimulationValues {
@@ -1764,6 +1741,14 @@ fn average_validators_result(
             ),
         },
     }
+}
+
+fn cancel_after(token: &tokio_util::sync::CancellationToken, duration: StdDuration) {
+    let token = token.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(duration).await;
+        token.cancel();
+    });
 }
 
 fn randomize_start(tick_time: StdDuration) -> StdDuration {

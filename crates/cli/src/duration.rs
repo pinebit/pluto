@@ -49,7 +49,7 @@ impl Duration {
 
         Self::new(rounded)
     }
-    
+
     /// Returns the total number of nanoseconds.
     pub fn as_nanos(&self) -> u128 {
         self.inner.as_nanos()
