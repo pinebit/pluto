@@ -51,3 +51,6 @@ pub mod relay;
 
 /// Force direct connection behaviour.
 pub mod force_direct;
+
+/// Protobuf utilities.
+pub mod proto;

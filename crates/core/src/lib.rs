@@ -26,8 +26,9 @@ pub mod deadline;
 /// parsigdb
 pub mod parsigdb;
 
-/// Partial signature exchange.
-pub mod parsigex;
+mod parsigex_codec;
+
+pub use parsigex_codec::ParSigExCodecError;
 
 /// Test utilities.
 #[cfg(test)]

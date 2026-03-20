@@ -1,6 +1,10 @@
 #![allow(missing_docs)]
 
-use std::{collections::HashSet, path::PathBuf, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+    time::Duration,
+};
 
 use anyhow::{Context, Result, anyhow};
 use clap::Parser;
@@ -12,7 +16,6 @@ use libp2p::{
 };
 use pluto_cluster::lock::Lock;
 use pluto_core::{
-    parsigex::{self, DutyGater, Event, Handle, Verifier},
     signeddata::SignedRandao,
     types::{Duty, DutyType, ParSignedDataSet, PubKey, SlotNumber},
 };
@@ -25,6 +28,7 @@ use pluto_p2p::{
     peer::peer_id_from_key,
     relay::{MutableRelayReservation, RelayRouter},
 };
+use pluto_parsigex::{self as parsigex, DutyGater, Event, Handle, Verifier};
 use pluto_tracing::TracingConfig;
 use tokio::fs;
 use tokio_util::sync::CancellationToken;
@@ -36,7 +40,7 @@ struct CombinedBehaviour {
     relay: relay::client::Behaviour,
     relay_reservation: MutableRelayReservation,
     relay_router: RelayRouter,
-    parasigex: parsigex::Behaviour,
+    parsigex: parsigex::Behaviour,
 }
 
 #[derive(Debug)]
@@ -64,7 +68,7 @@ impl From<std::convert::Infallible> for CombinedBehaviourEvent {
 }
 
 #[derive(Debug, Parser)]
-#[command(name = "parasigex-example")]
+#[command(name = "parsigex-example")]
 #[command(about = "Demonstrates partial signature exchange over the bootnode/relay P2P path")]
 struct Args {
     /// Relay URLs or multiaddrs.
@@ -171,10 +175,11 @@ async fn main() -> Result<()> {
     let known_peers = lock
         .peer_ids()
         .context("failed to derive peer IDs from lock")?;
-    let self_index = known_peers
-        .iter()
-        .position(|peer_id| *peer_id == local_peer_id)
-        .ok_or_else(|| anyhow!("local peer ID {local_peer_id} not found in cluster lock"))?;
+    if !known_peers.contains(&local_peer_id) {
+        return Err(anyhow!(
+            "local peer ID {local_peer_id} not found in cluster lock"
+        ));
+    }
     let conn_gater = gater::ConnGater::new(
         gater::Config::closed()
             .with_relays(relays.clone())
@@ -200,7 +205,7 @@ async fn main() -> Result<()> {
         .filter_map(|relay| relay.peer().ok().flatten().map(|peer| peer.id))
         .collect();
 
-    let mut parasigex_handle: Option<Handle> = None;
+    let mut parsigex_handle: Option<Handle> = None;
     let mut node: Node<CombinedBehaviour> = Node::new(
         p2p_config,
         key,
@@ -209,28 +214,21 @@ async fn main() -> Result<()> {
         known_peers.clone(),
         |builder, keypair, relay_client| {
             let p2p_context = builder.p2p_context();
-            let broadcast_context = p2p_context.clone();
             let local_peer_id = keypair.public().to_peer_id();
             let config = parsigex::Config::new(
-                known_peers.clone(),
-                self_index,
+                local_peer_id,
+                p2p_context.clone(),
                 verifier.clone(),
                 duty_gater.clone(),
-                std::sync::Arc::new(move |peer| {
-                    !broadcast_context
-                        .peer_store_lock()
-                        .connections_to_peer(peer)
-                        .is_empty()
-                }),
             )
             .with_timeout(Duration::from_secs(10));
-            let (parasigex, handle) = parsigex::Behaviour::new(config);
-            parasigex_handle = Some(handle);
+            let (parsigex, handle) = parsigex::Behaviour::new(config, local_peer_id);
+            parsigex_handle = Some(handle);
 
             builder
                 .with_gater(conn_gater)
                 .with_inner(CombinedBehaviour {
-                    parasigex,
+                    parsigex,
                     relay: relay_client,
                     relay_reservation: MutableRelayReservation::new(relays.clone()),
                     relay_router: RelayRouter::new(relays.clone(), p2p_context, local_peer_id),
@@ -238,18 +236,19 @@ async fn main() -> Result<()> {
         },
     )?;
 
-    let parasigex_handle =
-        parasigex_handle.ok_or_else(|| anyhow!("parasigex handle should be created"))?;
+    let parsigex_handle =
+        parsigex_handle.ok_or_else(|| anyhow!("parsigex handle should be created"))?;
 
     info!(
         peer_id = %node.local_peer_id(),
         data_dir = %args.data_dir.display(),
         known_peers = ?known_peers,
         relays = ?args.relays,
-        "parasigex example started"
+        "parsigex example started"
     );
 
     let mut ticker = tokio::time::interval(Duration::from_secs(args.broadcast_every));
+    let mut pending_broadcasts: HashMap<u64, (Duty, u64)> = HashMap::new();
 
     loop {
         tokio::select! {
@@ -263,9 +262,15 @@ async fn main() -> Result<()> {
                 let duty = Duty::new(SlotNumber::new(*slot), DutyType::Randao);
                 let data_set = make_sample_set(*slot, args.share_idx);
 
-                match parasigex_handle.broadcast(duty.clone(), data_set.clone()).await {
-                    Ok(()) => {
-                        info!(duty = %duty, share_idx = args.share_idx, "broadcasted sample partial signature set");
+                match parsigex_handle.broadcast(duty.clone(), data_set.clone()).await {
+                    Ok(request_id) => {
+                        pending_broadcasts.insert(request_id, (duty.clone(), args.share_idx));
+                        info!(
+                            request_id,
+                            duty = %duty,
+                            share_idx = args.share_idx,
+                            "queued sample partial signature set for broadcast"
+                        );
                         *slot = slot.saturating_add(1);
                     }
                     Err(error) => {
@@ -274,7 +279,6 @@ async fn main() -> Result<()> {
                 }
             }
             event = node.select_next_some() => {
-                info!("received swarm event");
                 let peer_type = |peer_id: &libp2p::PeerId| {
                     if relay_peer_ids.contains(peer_id) {
                         "RELAY"
@@ -433,7 +437,67 @@ async fn main() -> Result<()> {
                     SwarmEvent::Behaviour(PlutoBehaviourEvent::Inner(
                         CombinedBehaviourEvent::ParSigEx(Event::Error { peer, error, .. }),
                     )) => {
-                        warn!(peer = %peer, error = %error, "parasigex protocol error");
+                        warn!(peer = %peer, error = %error, "parsigex protocol error");
+                    }
+                    SwarmEvent::Behaviour(PlutoBehaviourEvent::Inner(
+                        CombinedBehaviourEvent::ParSigEx(Event::BroadcastError {
+                            request_id,
+                            peer,
+                            error,
+                        }),
+                    )) => {
+                        match pending_broadcasts.get(&request_id) {
+                            Some((duty, share_idx)) => {
+                                warn!(
+                                    request_id,
+                                    duty = %duty,
+                                    share_idx,
+                                    peer = ?peer,
+                                    error = %error,
+                                    "sample partial signature broadcast failed"
+                                );
+                            }
+                            None => {
+                                warn!(
+                                    request_id,
+                                    peer = ?peer,
+                                    error = %error,
+                                    "partial signature broadcast failed"
+                                );
+                            }
+                        }
+                    }
+                    SwarmEvent::Behaviour(PlutoBehaviourEvent::Inner(
+                        CombinedBehaviourEvent::ParSigEx(Event::BroadcastComplete {
+                            request_id,
+                        }),
+                    )) => {
+                        if let Some((duty, share_idx)) = pending_broadcasts.remove(&request_id) {
+                            info!(
+                                request_id,
+                                duty = %duty,
+                                share_idx,
+                                "broadcasted sample partial signature set"
+                            );
+                        } else {
+                            info!(request_id, "partial signature broadcast completed");
+                        }
+                    }
+                    SwarmEvent::Behaviour(PlutoBehaviourEvent::Inner(
+                        CombinedBehaviourEvent::ParSigEx(Event::BroadcastFinished {
+                            request_id,
+                        }),
+                    )) => {
+                        if let Some((duty, share_idx)) = pending_broadcasts.remove(&request_id) {
+                            warn!(
+                                request_id,
+                                duty = %duty,
+                                share_idx,
+                                "sample partial signature broadcast finished with failures"
+                            );
+                        } else {
+                            warn!(request_id, "partial signature broadcast finished with failures");
+                        }
                     }
                     SwarmEvent::NewListenAddr { address, .. } => {
                         info!(address = %address, "listening");

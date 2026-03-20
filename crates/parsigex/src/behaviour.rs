@@ -12,21 +12,21 @@ use std::{
     time::Duration,
 };
 
+use either::Either;
 use libp2p::{
     Multiaddr, PeerId,
     swarm::{
         ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, NotifyHandler, THandler,
-        THandlerInEvent, THandlerOutEvent, ToSwarm,
+        THandlerInEvent, THandlerOutEvent, ToSwarm, dummy,
     },
 };
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::mpsc;
 
-use crate::types::{Duty, ParSignedData, ParSignedDataSet, PubKey};
+use pluto_core::types::{Duty, ParSignedData, ParSignedDataSet, PubKey};
+use pluto_p2p::p2p_context::P2PContext;
 
-use super::{
-    Error as CodecError, Handler, encode_message,
-    handler::{Failure as HandlerFailure, FromHandler, ToHandler},
-};
+use super::{Error as CodecError, Handler, encode_message};
+use crate::handler::{Failure as HandlerFailure, FromHandler, ToHandler};
 
 /// Future returned by verifier callbacks.
 pub type VerifyFuture =
@@ -38,9 +38,6 @@ pub type Verifier =
 
 /// Duty gate callback type.
 pub type DutyGater = Arc<dyn Fn(&Duty) -> bool + Send + Sync + 'static>;
-
-/// Peer connection callback type.
-pub type PeerConnectionChecker = Arc<dyn Fn(&PeerId) -> bool + Send + Sync + 'static>;
 
 /// Error type for signature verification callbacks.
 #[derive(Debug, thiserror::Error)]
@@ -92,7 +89,7 @@ pub enum Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Event emitted by the partial signature exchange behaviour.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum Event {
     /// A verified partial signature set was received from a peer.
     Received {
@@ -114,12 +111,31 @@ pub enum Event {
         /// Failure reason.
         error: HandlerFailure,
     },
+    /// Broadcast failed.
+    BroadcastError {
+        /// Request identifier.
+        request_id: u64,
+        /// Peer for which the broadcast failed.
+        peer: Option<PeerId>,
+        /// Failure reason.
+        error: HandlerFailure,
+    },
+    /// Broadcast completed successfully for all targeted peers.
+    BroadcastComplete {
+        /// Request identifier.
+        request_id: u64,
+    },
+    /// Broadcast finished after one or more peer failures.
+    BroadcastFinished {
+        /// Request identifier.
+        request_id: u64,
+    },
 }
 
 #[derive(Debug)]
 struct PendingBroadcast {
     remaining: usize,
-    responder: oneshot::Sender<Result<()>>,
+    failed: bool,
 }
 
 #[derive(Debug)]
@@ -128,7 +144,6 @@ enum Command {
         request_id: u64,
         duty: Duty,
         data_set: ParSignedDataSet,
-        responder: oneshot::Sender<Result<()>>,
     },
 }
 
@@ -141,48 +156,43 @@ pub struct Handle {
 
 impl Handle {
     /// Broadcasts a partial signature set to all peers except self.
-    pub async fn broadcast(&self, duty: Duty, data_set: ParSignedDataSet) -> Result<()> {
+    pub async fn broadcast(&self, duty: Duty, data_set: ParSignedDataSet) -> Result<u64> {
         let request_id = self.next_request_id.fetch_add(1, Ordering::Relaxed);
-        let (tx, rx) = oneshot::channel();
         self.tx
             .send(Command::Broadcast {
                 request_id,
                 duty,
                 data_set,
-                responder: tx,
             })
             .map_err(|_| Error::Closed)?;
 
-        Ok(())
+        Ok(request_id)
     }
 }
 
 /// Configuration for the partial signature exchange behaviour.
 #[derive(Clone)]
 pub struct Config {
-    peers: Vec<PeerId>,
-    self_index: usize,
+    peer_id: PeerId,
+    p2p_context: P2PContext,
     verifier: Verifier,
     duty_gater: DutyGater,
-    is_peer_connected: PeerConnectionChecker,
     timeout: Duration,
 }
 
 impl Config {
     /// Creates a new configuration.
     pub fn new(
-        peers: Vec<PeerId>,
-        self_index: usize,
+        peer_id: PeerId,
+        p2p_context: P2PContext,
         verifier: Verifier,
         duty_gater: DutyGater,
-        is_peer_connected: PeerConnectionChecker,
     ) -> Self {
         Self {
-            peers,
-            self_index,
+            peer_id,
+            p2p_context,
             verifier,
             duty_gater,
-            is_peer_connected,
             timeout: Duration::from_secs(20),
         }
     }
@@ -205,7 +215,8 @@ pub struct Behaviour {
 
 impl Behaviour {
     /// Creates a behaviour and a clonable broadcast handle.
-    pub fn new(config: Config) -> (Self, Handle) {
+    pub fn new(config: Config, peer_id: PeerId) -> (Self, Handle) {
+        debug_assert_eq!(config.peer_id, peer_id);
         let (tx, rx) = mpsc::unbounded_channel();
         let handle = Handle {
             tx,
@@ -230,40 +241,55 @@ impl Behaviour {
                 request_id,
                 duty,
                 data_set,
-                responder,
             } => {
                 let message = match encode_message(&duty, &data_set) {
                     Ok(message) => message,
                     Err(err) => {
-                        let _ = responder.send(Err(Error::from(err)));
+                        self.broadcast_error(request_id, None, HandlerFailure::Codec(err));
                         return;
                     }
                 };
 
+                let peers: Vec<_> = self
+                    .config
+                    .p2p_context
+                    .known_peers()
+                    .iter()
+                    .copied()
+                    .collect();
                 let mut targeted = 0usize;
-                for (idx, peer) in self.config.peers.iter().enumerate() {
-                    if idx == self.config.self_index {
+                for peer in peers {
+                    if peer == self.config.peer_id {
                         continue;
                     }
 
-                    if !(self.config.is_peer_connected)(peer) {
-                        let _ = responder.send(Err(Error::PeerNotConnected(*peer)));
-                        return;
+                    if self
+                        .config
+                        .p2p_context
+                        .peer_store_lock()
+                        .connections_to_peer(&peer)
+                        .is_empty()
+                    {
+                        self.broadcast_error(
+                            request_id,
+                            Some(peer),
+                            HandlerFailure::Io(format!("peer {peer} is not connected")),
+                        );
+                        continue;
                     }
 
                     self.pending_actions.push_back(ToSwarm::NotifyHandler {
-                        peer_id: *peer,
+                        peer_id: peer,
                         handler: NotifyHandler::Any,
-                        event: ToHandler::Send {
+                        event: Either::Left(ToHandler::Send {
                             request_id,
                             payload: message.clone(),
-                        },
+                        }),
                     });
                     targeted = targeted.saturating_add(1);
                 }
 
                 if targeted == 0 {
-                    let _ = responder.send(Ok(()));
                     return;
                 }
 
@@ -271,38 +297,47 @@ impl Behaviour {
                     request_id,
                     PendingBroadcast {
                         remaining: targeted,
-                        responder,
+                        failed: false,
                     },
                 );
             }
         }
     }
 
-    fn finish_broadcast_success(&mut self, request_id: u64) {
+    fn finish_broadcast_result(&mut self, request_id: u64, failed: bool) {
         let Some(entry) = self.pending_broadcasts.get_mut(&request_id) else {
             return;
         };
 
+        entry.failed |= failed;
         entry.remaining = entry.remaining.saturating_sub(1);
         if entry.remaining == 0 {
-            if let Some(entry) = self.pending_broadcasts.remove(&request_id) {
-                let _ = entry.responder.send(Ok(()));
+            let failed = self
+                .pending_broadcasts
+                .remove(&request_id)
+                .map(|entry| entry.failed)
+                .unwrap_or(failed);
+            if failed {
+                self.events
+                    .push_back(Event::BroadcastFinished { request_id });
+            } else {
+                self.events
+                    .push_back(Event::BroadcastComplete { request_id });
             }
         }
     }
 
-    fn finish_broadcast_error(&mut self, request_id: u64, peer: PeerId, error: HandlerFailure) {
-        if let Some(entry) = self.pending_broadcasts.remove(&request_id) {
-            let _ = entry.responder.send(Err(Error::BroadcastPeer {
-                peer,
-                source: error,
-            }));
-        }
+    fn broadcast_error(&mut self, request_id: u64, peer: Option<PeerId>, error: HandlerFailure) {
+        self.events.push_back(Event::BroadcastError {
+            request_id,
+            peer,
+            error,
+        });
     }
 }
 
 impl NetworkBehaviour for Behaviour {
-    type ConnectionHandler = Handler;
+    type ConnectionHandler = Either<Handler, dummy::ConnectionHandler>;
     type ToSwarm = Event;
 
     fn handle_established_inbound_connection(
@@ -312,13 +347,17 @@ impl NetworkBehaviour for Behaviour {
         _local_addr: &Multiaddr,
         _remote_addr: &Multiaddr,
     ) -> std::result::Result<THandler<Self>, ConnectionDenied> {
+        if !self.config.p2p_context.is_known_peer(&peer) {
+            return Ok(Either::Right(dummy::ConnectionHandler));
+        }
+
         tracing::trace!("establishing inbound connection to peer: {:?}", peer);
-        Ok(Handler::new(
+        Ok(Either::Left(Handler::new(
             self.config.timeout,
             self.config.verifier.clone(),
             self.config.duty_gater.clone(),
             peer,
-        ))
+        )))
     }
 
     fn handle_established_outbound_connection(
@@ -329,13 +368,17 @@ impl NetworkBehaviour for Behaviour {
         _role_override: libp2p::core::Endpoint,
         _port_use: libp2p::core::transport::PortUse,
     ) -> std::result::Result<THandler<Self>, ConnectionDenied> {
+        if !self.config.p2p_context.is_known_peer(&peer) {
+            return Ok(Either::Right(dummy::ConnectionHandler));
+        }
+
         tracing::trace!("establishing outbound connection to peer: {:?}", peer);
-        Ok(Handler::new(
+        Ok(Either::Left(Handler::new(
             self.config.timeout,
             self.config.verifier.clone(),
             self.config.duty_gater.clone(),
             peer,
-        ))
+        )))
     }
 
     fn on_swarm_event(&mut self, _event: FromSwarm) {}
@@ -346,6 +389,11 @@ impl NetworkBehaviour for Behaviour {
         connection_id: ConnectionId,
         event: THandlerOutEvent<Self>,
     ) {
+        let event = match event {
+            Either::Left(event) => event,
+            Either::Right(value) => match value {},
+        };
+
         tracing::trace!("received connection handler event: {:?}", event);
         match event {
             FromHandler::Received { duty, data_set } => {
@@ -364,10 +412,11 @@ impl NetworkBehaviour for Behaviour {
                 });
             }
             FromHandler::OutboundSuccess { request_id } => {
-                self.finish_broadcast_success(request_id);
+                self.finish_broadcast_result(request_id, false);
             }
             FromHandler::OutboundError { request_id, error } => {
-                self.finish_broadcast_error(request_id, peer_id, error);
+                self.finish_broadcast_result(request_id, true);
+                self.broadcast_error(request_id, Some(peer_id), error);
             }
         }
     }

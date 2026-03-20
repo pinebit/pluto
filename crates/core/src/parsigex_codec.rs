@@ -1,4 +1,4 @@
-//! Message and type conversion helpers for partial signature exchange.
+//! Partial signature exchange codec helpers used by core types.
 
 use std::any::Any;
 
@@ -12,9 +12,47 @@ use crate::{
     types::{DutyType, Signature, SignedData},
 };
 
-use super::Error;
+/// Error type for partial signature exchange codec operations.
+#[derive(Debug, thiserror::Error)]
+pub enum ParSigExCodecError {
+    /// Missing duty or data set fields.
+    #[error("invalid parsigex msg fields")]
+    InvalidMessageFields,
 
-pub(crate) fn serialize_signed_data(data: &dyn SignedData) -> Result<Vec<u8>, Error> {
+    /// Invalid partial signed data set proto.
+    #[error("invalid partial signed data set proto fields")]
+    InvalidParSignedDataSetFields,
+
+    /// Invalid partial signed proto.
+    #[error("invalid partial signed proto")]
+    InvalidParSignedProto,
+
+    /// Invalid duty type.
+    #[error("invalid duty")]
+    InvalidDuty,
+
+    /// Unsupported duty type.
+    #[error("unsupported duty type")]
+    UnsupportedDutyType,
+
+    /// Deprecated builder proposer duty.
+    #[error("deprecated duty builder proposer")]
+    DeprecatedBuilderProposer,
+
+    /// Failed to parse a public key.
+    #[error("invalid public key: {0}")]
+    InvalidPubKey(String),
+
+    /// Invalid share index.
+    #[error("invalid share index")]
+    InvalidShareIndex,
+
+    /// Serialization failed.
+    #[error("marshal signed data: {0}")]
+    Serialize(#[from] serde_json::Error),
+}
+
+pub(crate) fn serialize_signed_data(data: &dyn SignedData) -> Result<Vec<u8>, ParSigExCodecError> {
     let any = data as &dyn Any;
 
     macro_rules! serialize_as {
@@ -39,27 +77,27 @@ pub(crate) fn serialize_signed_data(data: &dyn SignedData) -> Result<Vec<u8>, Er
     serialize_as!(SyncCommitteeSelection);
     serialize_as!(SignedSyncContributionAndProof);
 
-    Err(Error::UnsupportedDutyType)
+    Err(ParSigExCodecError::UnsupportedDutyType)
 }
 
 pub(crate) fn deserialize_signed_data(
     duty_type: &DutyType,
     bytes: &[u8],
-) -> Result<Box<dyn SignedData>, Error> {
+) -> Result<Box<dyn SignedData>, ParSigExCodecError> {
     macro_rules! deserialize_json {
         ($ty:ty) => {
             serde_json::from_slice::<$ty>(bytes)
                 .map(|value| Box::new(value) as Box<dyn SignedData>)
-                .map_err(Error::from)
+                .map_err(ParSigExCodecError::from)
         };
     }
 
     match duty_type {
         DutyType::Attester => deserialize_json!(VersionedAttestation)
             .or_else(|_| deserialize_json!(Attestation))
-            .map_err(|_| Error::UnsupportedDutyType),
+            .map_err(|_| ParSigExCodecError::UnsupportedDutyType),
         DutyType::Proposer => deserialize_json!(VersionedSignedProposal),
-        DutyType::BuilderProposer => Err(Error::DeprecatedBuilderProposer),
+        DutyType::BuilderProposer => Err(ParSigExCodecError::DeprecatedBuilderProposer),
         DutyType::BuilderRegistration => deserialize_json!(VersionedSignedValidatorRegistration),
         DutyType::Exit => deserialize_json!(SignedVoluntaryExit),
         DutyType::Randao => deserialize_json!(SignedRandao),
@@ -67,12 +105,12 @@ pub(crate) fn deserialize_signed_data(
         DutyType::PrepareAggregator => deserialize_json!(BeaconCommitteeSelection),
         DutyType::Aggregator => deserialize_json!(VersionedSignedAggregateAndProof)
             .or_else(|_| deserialize_json!(SignedAggregateAndProof))
-            .map_err(|_| Error::UnsupportedDutyType),
+            .map_err(|_| ParSigExCodecError::UnsupportedDutyType),
         DutyType::SyncMessage => deserialize_json!(SignedSyncMessage),
         DutyType::PrepareSyncContribution => deserialize_json!(SyncCommitteeSelection),
         DutyType::SyncContribution => deserialize_json!(SignedSyncContributionAndProof),
         DutyType::Unknown | DutyType::InfoSync | DutyType::DutySentinel(_) => {
-            Err(Error::UnsupportedDutyType)
+            Err(ParSigExCodecError::UnsupportedDutyType)
         }
     }
 }

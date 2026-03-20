@@ -9,11 +9,9 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Debug as StdDebug;
 
 use crate::{
+    ParSigExCodecError,
     corepb::v1::core as pbcore,
-    parsigex::{
-        Error as ParSigExCodecError,
-        signed_data::{deserialize_signed_data, serialize_signed_data},
-    },
+    parsigex_codec::{deserialize_signed_data, serialize_signed_data},
     signeddata::SignedDataError,
 };
 

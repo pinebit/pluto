@@ -248,7 +248,9 @@ impl RelayRouter {
     /// Creates a new relay router.
     pub fn new(relays: Vec<MutablePeer>, p2p_context: P2PContext, local_peer_id: PeerId) -> Self {
         let mut interval = tokio::time::interval_at(
-            Instant::now() + RELAY_ROUTER_INITIAL_DELAY,
+            Instant::now()
+                .checked_add(RELAY_ROUTER_INITIAL_DELAY)
+                .expect("should not overflow"),
             RELAY_ROUTER_INTERVAL,
         );
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
