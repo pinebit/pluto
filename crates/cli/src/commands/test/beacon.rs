@@ -2113,8 +2113,10 @@ async fn req_submit_sync_committee_contribution(target: &str) -> CliResult<StdDu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use wiremock::matchers::{method, path};
-    use wiremock::{Mock, MockServer, ResponseTemplate};
+    use wiremock::{
+        Mock, MockServer, ResponseTemplate,
+        matchers::{method, path},
+    };
 
     fn default_test_config() -> TestConfigArgs {
         TestConfigArgs {
@@ -2391,8 +2393,8 @@ mod tests {
         let cfg = default_beacon_args(vec![]);
         let result = beacon_ping_test(cancel, cfg, &url_without_auth).await;
 
-        // Without credentials the request still succeeds (no auth enforcement by request_rtt),
-        // but no Authorization header is sent.
+        // Without credentials the request still succeeds (no auth enforcement by
+        // request_rtt), but no Authorization header is sent.
         assert_eq!(result.verdict, TestVerdict::Ok);
 
         let requests = server.received_requests().await.unwrap();

@@ -1016,8 +1016,8 @@ mod tests {
 
     #[test]
     fn test_parse_endpoint_url_with_special_chars_in_password() {
-        // Go source uses "p@ss!123" as the raw password; in Rust's url crate the '@' must be
-        // percent-encoded as "p%40ss!123" to be unambiguously parsed.
+        // Go source uses "p@ss!123" as the raw password; in Rust's url crate the '@'
+        // must be percent-encoded as "p%40ss!123" to be unambiguously parsed.
         let (clean, creds) =
             parse_endpoint_url("https://user:p%40ss!123@beacon.example.com").unwrap();
         assert_eq!(clean, "https://beacon.example.com/");
