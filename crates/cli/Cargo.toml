@@ -35,11 +35,13 @@ serde_with = { workspace = true, features = ["base64"] }
 rand.workspace = true
 tempfile.workspace = true
 reqwest.workspace = true
+percent-encoding.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
 test-case.workspace = true
 backon.workspace = true
+wiremock.workspace = true
 
 [lints]
 workspace = true

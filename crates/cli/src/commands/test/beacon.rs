@@ -6,11 +6,16 @@
 #![allow(clippy::arithmetic_side_effects, clippy::cast_possible_truncation)]
 
 use super::{
-    COMMITTEE_SIZE_PER_SLOT, CategoryScore, EPOCH_TIME, SLOT_TIME, SLOTS_IN_EPOCH,
-    SUB_COMMITTEE_SIZE, TestCaseName, TestCategory, TestCategoryResult, TestConfigArgs, TestResult,
-    TestVerdict, apply_basic_auth, calculate_score, evaluate_highest_rtt, evaluate_rtt,
-    filter_tests, must_output_to_file_on_quiet, parse_endpoint_url, publish_result_to_obol_api,
-    request_rtt, sort_tests, write_result_to_file, write_result_to_writer,
+    TestConfigArgs,
+    constants::{
+        COMMITTEE_SIZE_PER_SLOT, EPOCH_TIME, SLOT_TIME, SLOTS_IN_EPOCH, SUB_COMMITTEE_SIZE,
+    },
+    helpers::{
+        CategoryScore, TestCaseName, TestCategory, TestCategoryResult, TestResult, TestVerdict,
+        apply_basic_auth, calculate_score, evaluate_highest_rtt, evaluate_rtt, filter_tests,
+        must_output_to_file_on_quiet, parse_endpoint_url, publish_result_to_obol_api, request_rtt,
+        sort_tests, write_result_to_file, write_result_to_writer,
+    },
 };
 use crate::{duration::Duration, error::Result as CliResult};
 use clap::Args;
@@ -2103,4 +2108,298 @@ async fn req_submit_sync_committee_contribution(target: &str) -> CliResult<StdDu
         reqwest::StatusCode::OK,
     )
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    fn default_test_config() -> TestConfigArgs {
+        TestConfigArgs {
+            output_json: String::new(),
+            quiet: false,
+            test_cases: None,
+            timeout: StdDuration::from_secs(60),
+            publish: false,
+            publish_addr: String::new(),
+            publish_private_key_file: std::path::PathBuf::new(),
+        }
+    }
+
+    fn default_beacon_args(endpoints: Vec<String>) -> TestBeaconArgs {
+        TestBeaconArgs {
+            test_config: default_test_config(),
+            endpoints,
+            load_test: false,
+            load_test_duration: StdDuration::from_secs(5),
+            simulation_duration: SLOTS_IN_EPOCH,
+            simulation_file_dir: std::path::PathBuf::from("./"),
+            simulation_verbose: false,
+            simulation_custom: 0,
+        }
+    }
+
+    async fn start_healthy_mocked_beacon_node() -> MockServer {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/eth/v1/node/health"))
+            .respond_with(ResponseTemplate::new(200))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/eth/v1/node/syncing"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_string(
+                    r#"{"data":{"head_slot":"0","sync_distance":"0","is_optimistic":false,"is_syncing":false}}"#,
+                ),
+            )
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/eth/v1/node/peers"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"meta":{"count":500}}"#))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/eth/v1/node/version"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(
+                r#"{"data":{"version":"BeaconNodeProvider/v1.0.0/linux_x86_64"}}"#,
+            ))
+            .mount(&server)
+            .await;
+
+        server
+    }
+
+    fn expected_results_for_healthy_node() -> Vec<(&'static str, TestVerdict)> {
+        vec![
+            ("Ping", TestVerdict::Ok),
+            ("PingMeasure", TestVerdict::Good),
+            ("Version", TestVerdict::Ok),
+            ("Synced", TestVerdict::Ok),
+            ("PeerCount", TestVerdict::Good),
+            ("PingLoad", TestVerdict::Skip),
+            ("Simulate1", TestVerdict::Skip),
+            ("Simulate10", TestVerdict::Skip),
+            ("Simulate100", TestVerdict::Skip),
+            ("Simulate500", TestVerdict::Skip),
+            ("Simulate1000", TestVerdict::Skip),
+            ("SimulateCustom", TestVerdict::Skip),
+        ]
+    }
+
+    fn assert_results(
+        results: &std::collections::HashMap<String, Vec<TestResult>>,
+        target: &str,
+        expected: &[(&str, TestVerdict)],
+    ) {
+        let target_results = results.get(target).expect("missing target in results");
+        assert_eq!(
+            target_results.len(),
+            expected.len(),
+            "result count mismatch for {target}"
+        );
+        for (result, (name, verdict)) in target_results.iter().zip(expected) {
+            assert_eq!(result.name, *name, "name mismatch");
+            assert_eq!(result.verdict, *verdict, "verdict mismatch for {name}");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_beacon_default_scenario() {
+        let server = start_healthy_mocked_beacon_node().await;
+        let url = server.uri();
+        let args = default_beacon_args(vec![url.clone()]);
+
+        let mut buf = Vec::new();
+        let res = run(args, &mut buf).await.unwrap();
+
+        let expected = expected_results_for_healthy_node();
+        assert_results(&res.targets, &url, &expected);
+    }
+
+    #[tokio::test]
+    async fn test_beacon_connection_refused() {
+        let port1 = 19876;
+        let port2 = 19877;
+        let endpoint1 = format!("http://localhost:{port1}");
+        let endpoint2 = format!("http://localhost:{port2}");
+        let args = default_beacon_args(vec![endpoint1.clone(), endpoint2.clone()]);
+
+        let mut buf = Vec::new();
+        let res = run(args, &mut buf).await.unwrap();
+
+        for endpoint in [&endpoint1, &endpoint2] {
+            let target_results = res.targets.get(endpoint).expect("missing target");
+            for r in target_results {
+                match r.name.as_str() {
+                    "PingLoad" | "Simulate1" | "Simulate10" | "Simulate100" | "Simulate500"
+                    | "Simulate1000" | "SimulateCustom" => {
+                        assert_eq!(r.verdict, TestVerdict::Skip, "expected skip for {}", r.name);
+                    }
+                    _ => {
+                        assert_eq!(r.verdict, TestVerdict::Fail, "expected fail for {}", r.name);
+                        assert!(
+                            r.error.message().is_some(),
+                            "expected error message for {}",
+                            r.name
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_beacon_timeout() {
+        let endpoint1 = "http://localhost:19878".to_string();
+        let endpoint2 = "http://localhost:19879".to_string();
+        let mut args = default_beacon_args(vec![endpoint1.clone(), endpoint2.clone()]);
+        args.test_config.timeout = StdDuration::from_nanos(100);
+
+        let mut buf = Vec::new();
+        let res = run(args, &mut buf).await.unwrap();
+
+        for endpoint in [&endpoint1, &endpoint2] {
+            let target_results = res.targets.get(endpoint).expect("missing target");
+            let first = &target_results[0];
+            assert_eq!(first.name, "Ping");
+            assert_eq!(first.verdict, TestVerdict::Fail);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_beacon_quiet() {
+        let dir = tempfile::tempdir().unwrap();
+        let json_path = dir.path().join("output.json");
+
+        let endpoint1 = "http://localhost:19880".to_string();
+        let endpoint2 = "http://localhost:19881".to_string();
+        let mut args = default_beacon_args(vec![endpoint1, endpoint2]);
+        args.test_config.quiet = true;
+        args.test_config.output_json = json_path.to_str().unwrap().to_string();
+
+        let mut buf = Vec::new();
+        let res = run(args, &mut buf).await.unwrap();
+
+        assert!(buf.is_empty(), "expected no output on quiet mode");
+        assert!(!res.targets.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_beacon_unsupported_test() {
+        let args = TestBeaconArgs {
+            test_config: TestConfigArgs {
+                test_cases: Some(vec!["notSupportedTest".to_string()]),
+                ..default_test_config()
+            },
+            ..default_beacon_args(vec!["http://localhost:19882".to_string()])
+        };
+
+        let mut buf = Vec::new();
+        let err = run(args, &mut buf).await.unwrap_err();
+        assert!(
+            err.to_string().contains("test case not supported"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_beacon_custom_test_cases() {
+        let endpoint1 = "http://localhost:19883".to_string();
+        let endpoint2 = "http://localhost:19884".to_string();
+        let mut args = default_beacon_args(vec![endpoint1.clone(), endpoint2.clone()]);
+        args.test_config.test_cases = Some(vec!["Ping".to_string()]);
+
+        let mut buf = Vec::new();
+        let res = run(args, &mut buf).await.unwrap();
+
+        for endpoint in [&endpoint1, &endpoint2] {
+            let target_results = res.targets.get(endpoint).expect("missing target");
+            assert_eq!(target_results.len(), 1);
+            assert_eq!(target_results[0].name, "Ping");
+            assert_eq!(target_results[0].verdict, TestVerdict::Fail);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_beacon_write_to_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let file_path = dir.path().join("beacon-test-output.json");
+
+        let endpoint1 = "http://localhost:19885".to_string();
+        let endpoint2 = "http://localhost:19886".to_string();
+        let mut args = default_beacon_args(vec![endpoint1, endpoint2]);
+        args.test_config.output_json = file_path.to_str().unwrap().to_string();
+
+        let mut buf = Vec::new();
+        let res = run(args, &mut buf).await.unwrap();
+
+        assert!(file_path.exists(), "output file should exist");
+
+        let content = std::fs::read_to_string(&file_path).unwrap();
+        let written: serde_json::Value = serde_json::from_str(&content).unwrap();
+        assert!(
+            written.get("beacon_node").is_some(),
+            "expected beacon_node key in output JSON"
+        );
+
+        assert_eq!(res.category_name, Some(TestCategory::Beacon));
+        assert!(res.score.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_beacon_basic_auth_with_credentials() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/eth/v1/node/health"))
+            .and(wiremock::matchers::header_exists("Authorization"))
+            .respond_with(ResponseTemplate::new(200))
+            .mount(&server)
+            .await;
+
+        let addr = server.address();
+        let url_with_auth = format!("http://testuser:testpass123@{addr}");
+
+        let cancel = tokio_util::sync::CancellationToken::new();
+        let cfg = default_beacon_args(vec![]);
+        let result = beacon_ping_test(cancel, cfg, &url_with_auth).await;
+
+        assert_eq!(result.verdict, TestVerdict::Ok);
+    }
+
+    #[tokio::test]
+    async fn test_beacon_basic_auth_without_credentials() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/eth/v1/node/health"))
+            .respond_with(ResponseTemplate::new(200))
+            .mount(&server)
+            .await;
+
+        let url_without_auth = server.uri();
+
+        let cancel = tokio_util::sync::CancellationToken::new();
+        let cfg = default_beacon_args(vec![]);
+        let result = beacon_ping_test(cancel, cfg, &url_without_auth).await;
+
+        // Without credentials the request still succeeds (no auth enforcement by request_rtt),
+        // but no Authorization header is sent.
+        assert_eq!(result.verdict, TestVerdict::Ok);
+
+        let requests = server.received_requests().await.unwrap();
+        assert_eq!(requests.len(), 1);
+        assert!(
+            requests[0].headers.get("Authorization").is_none(),
+            "Authorization header should not be present without credentials"
+        );
+    }
 }
