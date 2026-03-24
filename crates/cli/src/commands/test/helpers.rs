@@ -587,8 +587,12 @@ pub(crate) fn parse_endpoint_url(endpoint: &str) -> CliResult<(String, Option<(S
 
     let username = percent_decode(parsed.username());
     let password = percent_decode(parsed.password().unwrap_or_default());
-    parsed.set_username("").ok();
-    parsed.set_password(None).ok();
+    parsed.set_username("").map_err(|e| {
+        CliError::Other(format!("failed to clear username from endpoint URL: {e:?}"))
+    })?;
+    parsed.set_password(None).map_err(|e| {
+        CliError::Other(format!("failed to clear password from endpoint URL: {e:?}"))
+    })?;
 
     Ok((parsed.to_string(), Some((username, password))))
 }
