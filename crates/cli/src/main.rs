@@ -57,9 +57,11 @@ async fn main() -> ExitResult {
                     TestCommands::Peers(args) => commands::test::peers::run(args, &mut stdout)
                         .await
                         .map(|_| ()),
-                    TestCommands::Beacon(args) => commands::test::beacon::run(args, &mut stdout)
-                        .await
-                        .map(|_| ()),
+                    TestCommands::Beacon(args) => {
+                        commands::test::beacon::run(args, &mut stdout, ct.child_token())
+                            .await
+                            .map(|_| ())
+                    }
                     TestCommands::Validator(args) => {
                         commands::test::validator::run(args, &mut stdout)
                             .await

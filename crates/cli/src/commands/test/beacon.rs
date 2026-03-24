@@ -270,7 +270,11 @@ pub fn test_case_names() -> Vec<String> {
 }
 
 /// Runs the beacon node tests.
-pub async fn run(args: TestBeaconArgs, writer: &mut dyn Write) -> CliResult<TestCategoryResult> {
+pub async fn run(
+    args: TestBeaconArgs,
+    writer: &mut dyn Write,
+    shutdown: tokio_util::sync::CancellationToken,
+) -> CliResult<TestCategoryResult> {
     must_output_to_file_on_quiet(args.test_config.quiet, &args.test_config.output_json)?;
 
     tracing::info!("Starting beacon node test");
@@ -285,7 +289,7 @@ pub async fn run(args: TestBeaconArgs, writer: &mut dyn Write) -> CliResult<Test
     }
     sort_tests(&mut queued);
 
-    let cancel = tokio_util::sync::CancellationToken::new();
+    let cancel = shutdown.child_token();
     cancel_after(&cancel, args.test_config.timeout);
 
     let start = std::time::Instant::now();
@@ -2241,7 +2245,9 @@ mod tests {
         let args = default_beacon_args(vec![url.clone()]);
 
         let mut buf = Vec::new();
-        let res = run(args, &mut buf).await.unwrap();
+        let res = run(args, &mut buf, tokio_util::sync::CancellationToken::new())
+            .await
+            .unwrap();
 
         let expected = expected_results_for_healthy_node();
         assert_results(&res.targets, &url, &expected);
@@ -2256,7 +2262,9 @@ mod tests {
         let args = default_beacon_args(vec![endpoint1.clone(), endpoint2.clone()]);
 
         let mut buf = Vec::new();
-        let res = run(args, &mut buf).await.unwrap();
+        let res = run(args, &mut buf, tokio_util::sync::CancellationToken::new())
+            .await
+            .unwrap();
 
         for endpoint in [&endpoint1, &endpoint2] {
             let target_results = res.targets.get(endpoint).expect("missing target");
@@ -2287,7 +2295,9 @@ mod tests {
         args.test_config.timeout = StdDuration::from_nanos(100);
 
         let mut buf = Vec::new();
-        let res = run(args, &mut buf).await.unwrap();
+        let res = run(args, &mut buf, tokio_util::sync::CancellationToken::new())
+            .await
+            .unwrap();
 
         for endpoint in [&endpoint1, &endpoint2] {
             let target_results = res.targets.get(endpoint).expect("missing target");
@@ -2309,7 +2319,9 @@ mod tests {
         args.test_config.output_json = json_path.to_str().unwrap().to_string();
 
         let mut buf = Vec::new();
-        let res = run(args, &mut buf).await.unwrap();
+        let res = run(args, &mut buf, tokio_util::sync::CancellationToken::new())
+            .await
+            .unwrap();
 
         assert!(buf.is_empty(), "expected no output on quiet mode");
         assert!(!res.targets.is_empty());
@@ -2326,7 +2338,9 @@ mod tests {
         };
 
         let mut buf = Vec::new();
-        let err = run(args, &mut buf).await.unwrap_err();
+        let err = run(args, &mut buf, tokio_util::sync::CancellationToken::new())
+            .await
+            .unwrap_err();
         assert!(
             err.to_string().contains("test case not supported"),
             "unexpected error: {err}"
@@ -2341,7 +2355,9 @@ mod tests {
         args.test_config.test_cases = Some(vec!["Ping".to_string()]);
 
         let mut buf = Vec::new();
-        let res = run(args, &mut buf).await.unwrap();
+        let res = run(args, &mut buf, tokio_util::sync::CancellationToken::new())
+            .await
+            .unwrap();
 
         for endpoint in [&endpoint1, &endpoint2] {
             let target_results = res.targets.get(endpoint).expect("missing target");
@@ -2362,7 +2378,9 @@ mod tests {
         args.test_config.output_json = file_path.to_str().unwrap().to_string();
 
         let mut buf = Vec::new();
-        let res = run(args, &mut buf).await.unwrap();
+        let res = run(args, &mut buf, tokio_util::sync::CancellationToken::new())
+            .await
+            .unwrap();
 
         assert!(file_path.exists(), "output file should exist");
 
