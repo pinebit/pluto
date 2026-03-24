@@ -1422,7 +1422,7 @@ async fn proposal_duty(
             _ = cancel.cancelled() => break,
             _ = tokio::time::sleep_until(deadline) => break,
             _ = interval.tick() => {
-                slot = slot.saturating_add(tick_time.as_secs() / SLOT_TIME_SECS).saturating_add(1);
+                slot = slot.saturating_add(tick_time.as_secs() / SLOT_TIME_SECS).saturating_add(1); // produce block for the next slot, as the current one might have already been proposed
             }
         }
     }
