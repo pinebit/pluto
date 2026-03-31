@@ -41,7 +41,7 @@ pub enum Commands {
         about = "Create artifacts for a distributed validator cluster",
         long_about = "Create artifacts for a distributed validator cluster. These commands can be used to facilitate the creation of a distributed validator cluster between a group of operators by performing a distributed key generation ceremony, or they can be used to create a local cluster for single operator use cases."
     )]
-    Create(CreateArgs),
+    Create(Box<CreateArgs>),
 
     #[command(about = "Print version and exit", long_about = "Output version info")]
     Version(VersionArgs),
@@ -141,5 +141,5 @@ pub enum CreateCommands {
         about = "Create private keys and configuration files needed to run a distributed validator cluster locally",
         long_about = "Creates a local charon cluster configuration including validator keys, charon p2p keys, cluster-lock.json and deposit-data.json file(s). See flags for supported features."
     )]
-    Cluster(CreateClusterArgs),
+    Cluster(Box<CreateClusterArgs>),
 }

@@ -39,7 +39,10 @@ async fn main() -> ExitResult {
     let result = match cli.command {
         Commands::Create(args) => match args.command {
             CreateCommands::Enr(args) => commands::create_enr::run(args),
-            CreateCommands::Cluster(args) => commands::create_cluster::run(args).await,
+            CreateCommands::Cluster(args) => {
+                let mut stdout = std::io::stdout();
+                commands::create_cluster::run(&mut stdout, *args).await
+            }
         },
         Commands::Enr(args) => commands::enr::run(args),
         Commands::Version(args) => commands::version::run(args),

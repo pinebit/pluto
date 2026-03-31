@@ -110,6 +110,10 @@ pub enum CliError {
     /// Eth2util network error.
     #[error("Eth2util network error: {0}")]
     Eth2utilNetworkError(#[from] eth2util::network::NetworkError),
+
+    /// Eth2util deposit error.
+    #[error("Eth2util deposit error: {0}")]
+    Eth2utilDepositError(#[from] eth2util::deposit::DepositError),
 }
 
 #[derive(Error, Debug)]
@@ -308,6 +312,65 @@ pub enum CreateClusterError {
     /// Record error.
     #[error("Record error: {0}")]
     RecordError(#[from] eth2util::enr::RecordError),
+
+    /// Insufficient withdrawal addresses.
+    #[error("Insufficient withdrawal addresses")]
+    InsufficientWithdrawalAddresses,
+
+    /// Empty deposit amounts.
+    #[error("Empty deposit amounts")]
+    EmptyDepositAmounts,
+
+    /// Keymanager error.
+    #[error("Keymanager error: {0}")]
+    KeymanagerError(#[from] eth2util::keymanager::KeymanagerError),
+
+    /// Insufficient fee addresses.
+    #[error("Insufficient fee addresses: expected {expected}, got {got}")]
+    InsufficientFeeAddresses {
+        /// Expected number of fee addresses.
+        expected: usize,
+        /// Actual number of fee addresses.
+        got: usize,
+    },
+
+    /// Invalid fork version length.
+    #[error("Invalid fork version length: expected 4 bytes")]
+    InvalidForkVersionLength,
+
+    /// Registration error.
+    #[error("Registration error: {0}")]
+    RegistrationError(#[from] eth2util::registration::RegistrationError),
+
+    /// Validator registration not found at the given index.
+    #[error("Validator registration not found at index {index}")]
+    ValidatorRegistrationNotFound {
+        /// Index that was out of bounds.
+        index: usize,
+    },
+
+    /// Deposit data not found for the given distributed validator pubkey.
+    #[error("Deposit data not found for distributed validator pubkey: {dv}")]
+    DepositDataNotFound {
+        /// Hex-encoded distributed validator pubkey.
+        dv: String,
+    },
+
+    /// Lock error (e.g. set_lock_hash failed).
+    #[error("Lock error: {0}")]
+    LockError(#[from] pluto_cluster::lock::LockError),
+
+    /// K1 utility signing error.
+    #[error("K1 util signing error: {0}")]
+    K1UtilError(#[from] pluto_k1util::K1UtilError),
+
+    /// Obol API error (publish_lock / launchpad URL).
+    #[error("Obol API error: {0}")]
+    ObolApiError(#[from] pluto_app::obolapi::ObolApiError),
+
+    /// Bundle output (tar.gz archival) error.
+    #[error("Bundle output error: {0}")]
+    BundleOutputError(#[from] pluto_app::utils::UtilsError),
 }
 
 #[derive(Error, Debug)]

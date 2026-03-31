@@ -6,12 +6,23 @@
 //! data files.
 
 use std::{
+    collections::HashMap,
+    io::Write,
     os::unix::fs::PermissionsExt as _,
     path::{Path, PathBuf},
 };
 
+use chrono::Utc;
 use k256::SecretKey;
-use pluto_cluster::{definition::Definition, helpers::fetch_definition, manifest::cluster, operator::Operator};
+use pluto_cluster::{
+    definition::Definition,
+    deposit::DepositData,
+    distvalidator::DistValidator,
+    helpers::{create_validator_keys_dir, fetch_definition},
+    lock::Lock,
+    operator::Operator,
+    registration::{BuilderRegistration, Registration},
+};
 use pluto_core::consensus::protocols;
 use pluto_crypto::{
     blst_impl::BlstImpl,
@@ -19,8 +30,18 @@ use pluto_crypto::{
     types::{PrivateKey, PublicKey},
 };
 use pluto_eth1wrap as eth1wrap;
+
+use pluto_app::{obolapi, utils as app_utils};
 use pluto_eth2util::{
-    self as eth2util, deposit, enr::Record, keystore::{load_files_recursively, load_files_unordered}, network
+    self as eth2util,
+    deposit::{self, Gwei},
+    enr::Record,
+    keymanager,
+    keystore::{
+        CONFIRM_INSECURE_KEYS, Keystore, encrypt as keystore_encrypt, load_files_recursively,
+        load_files_unordered, store_keys, store_keys_insecure,
+    },
+    network, registration as eth2util_registration,
 };
 use pluto_p2p::k1::new_saved_priv_key;
 use pluto_ssz::to_0x_hex;
@@ -356,7 +377,7 @@ fn validate_threshold(args: &CreateClusterArgs) -> Result<()> {
 }
 
 /// Runs the create cluster command
-pub async fn run(mut args: CreateClusterArgs) -> CliResult<()> {
+pub async fn run(w: &mut dyn Write, mut args: CreateClusterArgs) -> CliResult<()> {
     validate_threshold(&args)?;
 
     validate_create_config(&args)?;
@@ -367,7 +388,7 @@ pub async fn run(mut args: CreateClusterArgs) -> CliResult<()> {
     // args.num_validators to the amount of secrets we read.
     // If `split_keys` wasn't set, we wouldn't have reached this part of code
     // because `validate_create_config()` would've already errored.
-    if args.split_keys == true {
+    if args.split_keys {
         let use_sequence_keys = args.withdrawal_addrs.len() > 1;
 
         let Some(split_keys_dir) = &args.split_keys_dir else {
@@ -390,7 +411,7 @@ pub async fn run(mut args: CreateClusterArgs) -> CliResult<()> {
 
     // Get a cluster definition, either from a definition file or from the config.
     let definition_file = args.definition_file.clone();
-    let (def, mut deposit_amounts) = if let Some(definition_file) = definition_file {
+    let (mut def, mut deposit_amounts) = if let Some(definition_file) = definition_file {
         let Some(addr) = args.execution_engine_addr.clone() else {
             return Err(CreateClusterError::MissingExecutionEngineAddress.into());
         };
@@ -426,11 +447,11 @@ pub async fn run(mut args: CreateClusterArgs) -> CliResult<()> {
         (def, deposit_amounts)
     };
 
-    if deposit_amounts.len() == 0 {
+    if deposit_amounts.is_empty() {
         deposit_amounts = deposit::default_deposit_amounts(args.compounding);
     }
 
-    if secrets.len() == 0 {
+    if secrets.is_empty() {
         // This is the case in which split-keys is undefined and user passed validator
         // amount on CLI
         secrets = generate_keys(def.num_validators)?;
@@ -463,9 +484,375 @@ pub async fn run(mut args: CreateClusterArgs) -> CliResult<()> {
     tokio::fs::set_permissions(&args.cluster_dir, permissions).await?;
 
     // Create operators and their enr node keys
-    let (ops, node_keys) = get_operators(num_nodes, args.cluster_dir)?;
+    let (ops, node_keys) = get_operators(num_nodes, &args.cluster_dir)?;
+
+    def.operators = ops;
+
+    let keys_to_disk = args.keymanager_addrs.is_empty();
+
+    // Pre-compute public shares and clone private shares before share_sets is
+    // consumed by the write step.  The private share clone is needed for the
+    // aggregate BLS signature; the public shares are needed for DistValidator.
+    // Each entry is [share_node0, share_node1, ...] indexed by validator.
+    let tbls = BlstImpl;
+    let pub_shares_sets: Vec<Vec<PublicKey>> = share_sets
+        .clone()
+        .iter()
+        .map(|shares| {
+            shares
+                .iter()
+                .map(|s| tbls.secret_to_public_key(s))
+                .collect::<std::result::Result<Vec<_>, _>>()
+        })
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .map_err(CreateClusterError::CryptoError)?;
+
+    if keys_to_disk {
+        write_keys_to_disk(
+            num_nodes,
+            &args.cluster_dir,
+            args.insecure_keys,
+            &share_sets,
+        )
+        .await?;
+    } else {
+        write_keys_to_keymanager(&args, num_nodes, &share_sets).await?;
+    }
+
+    let network = eth2util::network::fork_version_to_network(&def.fork_version)?;
+
+    let deposit_datas = create_deposit_datas(
+        &def.withdrawal_addresses(),
+        &network,
+        &secrets,
+        &deposit_amounts,
+        def.compounding,
+    )?;
+
+    let eth2util_deposit_datas = deposit_datas
+        .iter()
+        .map(|dd| cluster_deposit_data_to_eth2util_deposit_data(dd))
+        .collect::<Vec<_>>();
+
+    // Write deposit-data files
+    eth2util::deposit::write_cluster_deposit_data_files(
+        &eth2util_deposit_datas,
+        network,
+        &args.cluster_dir,
+        usize::try_from(num_nodes).expect("num_nodes should fit in usize"),
+    )
+    .await?;
+
+    let val_regs = create_validator_registrations(
+        &def.fee_recipient_addresses(),
+        &secrets,
+        &def.fork_version,
+        args.split_keys,
+        args.target_gas_limit,
+    )?;
+
+    let vals = get_validators(&pub_keys, &pub_shares_sets, &deposit_datas, val_regs)?;
+
+    let mut lock = Lock {
+        definition: def,
+        distributed_validators: vals,
+        ..Default::default()
+    };
+
+    lock.set_lock_hash().map_err(CreateClusterError::from)?;
+
+    lock.signature_aggregate = agg_sign(&share_sets, &lock.lock_hash)?;
+
+    for op_key in &node_keys {
+        let node_sig =
+            pluto_k1util::sign(op_key, &lock.lock_hash).map_err(CreateClusterError::K1UtilError)?;
+        lock.node_signatures.push(node_sig.to_vec());
+    }
+
+    let mut dashboard_url = String::new();
+    if args.publish {
+        match write_lock_to_api(&args.publish_address, &lock).await {
+            Ok(url) => dashboard_url = url,
+            Err(err) => {
+                warn!(error = %err, "Failed to publish lock file to Obol API");
+            }
+        }
+    }
+
+    write_lock(&lock, &args.cluster_dir, num_nodes).await?;
+
+    if args.zipped {
+        app_utils::bundle_output(&args.cluster_dir, "cluster.tar.gz")
+            .map_err(CreateClusterError::BundleOutputError)?;
+    }
+
+    if args.split_keys {
+        write_split_keys_warning(w)?;
+    }
+
+    write_output(
+        w,
+        args.split_keys,
+        &args.cluster_dir,
+        num_nodes,
+        keys_to_disk,
+        args.zipped,
+    )?;
+
+    if !dashboard_url.is_empty() {
+        info!(
+            "You can find your newly-created cluster dashboard here: {}",
+            dashboard_url
+        );
+    }
 
     Ok(())
+}
+
+async fn write_lock_to_api(publish_addr: &str, lock: &Lock) -> Result<String> {
+    let client = obolapi::Client::new(publish_addr, obolapi::ClientOptions::default())
+        .map_err(CreateClusterError::ObolApiError)?;
+    match client.publish_lock(lock.clone()).await {
+        Ok(()) => {
+            info!(addr = publish_addr, "Published lock file");
+            match client.launchpad_url_for_lock(lock) {
+                Ok(url) => Ok(url),
+                Err(err) => Err(CreateClusterError::ObolApiError(err)),
+            }
+        }
+        Err(err) => Err(CreateClusterError::ObolApiError(err)),
+    }
+}
+
+fn create_validator_registrations(
+    fee_recipient_addresses: &[String],
+    secrets: &[PrivateKey],
+    fork_version: &[u8],
+    split_keys: bool,
+    target_gas_limit: u64,
+) -> Result<Vec<BuilderRegistration>> {
+    if fee_recipient_addresses.len() != secrets.len() {
+        return Err(CreateClusterError::InsufficientFeeAddresses {
+            expected: secrets.len(),
+            got: fee_recipient_addresses.len(),
+        });
+    }
+
+    let effective_gas_limit = if target_gas_limit == 0 {
+        warn!(
+            default_gas_limit = eth2util_registration::DEFAULT_GAS_LIMIT,
+            "Custom target gas limit not supported, setting to default"
+        );
+        eth2util_registration::DEFAULT_GAS_LIMIT
+    } else {
+        target_gas_limit
+    };
+
+    let fork_version_arr: [u8; 4] = fork_version
+        .try_into()
+        .map_err(|_| CreateClusterError::InvalidForkVersionLength)?;
+
+    let tbls = BlstImpl;
+    let mut registrations = Vec::with_capacity(secrets.len());
+
+    for (secret, fee_address) in secrets.iter().zip(fee_recipient_addresses.iter()) {
+        let timestamp = if split_keys {
+            Utc::now()
+        } else {
+            eth2util::network::fork_version_to_genesis_time(fork_version)?
+        };
+
+        let pk = tbls.secret_to_public_key(secret)?;
+
+        let unsigned_reg = eth2util_registration::new_message(
+            pk,
+            fee_address,
+            effective_gas_limit,
+            u64::try_from(timestamp.timestamp()).unwrap_or(0),
+        )?;
+
+        let sig_root =
+            eth2util_registration::get_message_signing_root(&unsigned_reg, fork_version_arr);
+
+        let sig = tbls.sign(secret, &sig_root)?;
+
+        registrations.push(BuilderRegistration {
+            message: Registration {
+                fee_recipient: unsigned_reg.fee_recipient,
+                gas_limit: unsigned_reg.gas_limit,
+                timestamp,
+                pub_key: unsigned_reg.pubkey,
+            },
+            signature: sig,
+        });
+    }
+
+    Ok(registrations)
+}
+
+fn cluster_deposit_data_to_eth2util_deposit_data(
+    deposit_datas: &[DepositData],
+) -> Vec<eth2util::deposit::DepositData> {
+    deposit_datas
+        .iter()
+        .map(|dd| eth2util::deposit::DepositData {
+            pubkey: dd.pub_key,
+            withdrawal_credentials: dd.withdrawal_credentials,
+            amount: dd.amount,
+            signature: dd.signature,
+        })
+        .collect()
+}
+
+async fn write_keys_to_disk(
+    num_nodes: u64,
+    cluster_dir: impl AsRef<Path>,
+    insecure_keys: bool,
+    share_sets: &[Vec<PrivateKey>],
+) -> Result<()> {
+    for i in 0..num_nodes {
+        let i_usize = usize::try_from(i).expect("node index should fit in usize on all platforms");
+
+        let mut secrets: Vec<PrivateKey> = Vec::new();
+        for shares in share_sets {
+            secrets.push(shares[i_usize]);
+        }
+
+        let keys_dir = create_validator_keys_dir(node_dir(cluster_dir.as_ref(), i))
+            .await
+            .map_err(CreateClusterError::IoError)?;
+
+        if insecure_keys {
+            store_keys_insecure(&secrets, &keys_dir, &CONFIRM_INSECURE_KEYS).await?;
+        } else {
+            store_keys(&secrets, &keys_dir).await?;
+        }
+    }
+
+    Ok(())
+}
+
+fn random_hex64() -> Result<String> {
+    let mut bytes = [0u8; 32];
+    rand::RngCore::fill_bytes(&mut OsRng, &mut bytes);
+    Ok(hex::encode(bytes))
+}
+
+async fn write_keys_to_keymanager(
+    args: &CreateClusterArgs,
+    num_nodes: u64,
+    share_sets: &[Vec<PrivateKey>],
+) -> Result<()> {
+    // Create and verify all keymanager clients first.
+    let mut clients: Vec<keymanager::Client> = Vec::new();
+    for i in 0..num_nodes {
+        let i_usize = usize::try_from(i).expect("node index should fit in usize on all platforms");
+        let cl = keymanager::Client::new(
+            &args.keymanager_addrs[i_usize],
+            &args.keymanager_auth_tokens[i_usize],
+        )?;
+        cl.verify_connection().await?;
+        clients.push(cl);
+    }
+
+    // For each node, build keystores from this node's share of each validator,
+    // then import them into that node's keymanager.
+    for i in 0..num_nodes {
+        let i_usize = usize::try_from(i).expect("node index should fit in usize on all platforms");
+
+        let mut keystores: Vec<Keystore> = Vec::new();
+        let mut passwords: Vec<String> = Vec::new();
+
+        // share_sets[validator_idx][node_idx]
+        for shares in share_sets {
+            let password = random_hex64()?;
+            let pbkdf2_c = if args.insecure_keys {
+                Some(16u32)
+            } else {
+                None
+            };
+            let store = keystore_encrypt(&shares[i_usize], &password, pbkdf2_c, &mut OsRng)?;
+            passwords.push(password);
+            keystores.push(store);
+        }
+
+        clients[i_usize]
+            .import_keystores(&keystores, &passwords)
+            .await
+            .inspect_err(|_| {
+                tracing::error!(
+                    addr = %args.keymanager_addrs[i_usize],
+                    "Failed to import keys",
+                );
+            })?;
+
+        info!(
+            node = format!("node{}", i),
+            addr = %args.keymanager_addrs[i_usize],
+            "Imported key shares to keymanager",
+        );
+    }
+
+    info!("Imported all validator keys to respective keymanagers");
+
+    Ok(())
+}
+
+fn create_deposit_datas(
+    withdrawal_addresses: &[String],
+    network: impl AsRef<str>,
+    secrets: &[PrivateKey],
+    deposit_amounts: &[Gwei],
+    compounding: bool,
+) -> Result<Vec<Vec<DepositData>>> {
+    if secrets.len() != withdrawal_addresses.len() {
+        return Err(CreateClusterError::InsufficientWithdrawalAddresses);
+    }
+    if deposit_amounts.is_empty() {
+        return Err(CreateClusterError::EmptyDepositAmounts);
+    }
+    let deduped = deposit::dedup_amounts(deposit_amounts);
+    sign_deposit_datas(
+        secrets,
+        withdrawal_addresses,
+        network.as_ref(),
+        &deduped,
+        compounding,
+    )
+}
+
+fn sign_deposit_datas(
+    secrets: &[PrivateKey],
+    withdrawal_addresses: &[String],
+    network: &str,
+    deposit_amounts: &[Gwei],
+    compounding: bool,
+) -> Result<Vec<Vec<DepositData>>> {
+    if secrets.len() != withdrawal_addresses.len() {
+        return Err(CreateClusterError::InsufficientWithdrawalAddresses);
+    }
+    if deposit_amounts.is_empty() {
+        return Err(CreateClusterError::EmptyDepositAmounts);
+    }
+    let tbls = BlstImpl;
+    let mut dd = Vec::new();
+    for &deposit_amount in deposit_amounts {
+        let mut datas = Vec::new();
+        for (secret, withdrawal_addr) in secrets.iter().zip(withdrawal_addresses.iter()) {
+            let pk = tbls.secret_to_public_key(secret)?;
+            let msg = deposit::new_message(pk, withdrawal_addr, deposit_amount, compounding)?;
+            let sig_root = deposit::get_message_signing_root(&msg, network)?;
+            let sig = tbls.sign(secret, &sig_root)?;
+            datas.push(DepositData {
+                pub_key: msg.pubkey,
+                withdrawal_credentials: msg.withdrawal_credentials,
+                amount: msg.amount,
+                signature: sig,
+            });
+        }
+        dd.push(datas);
+    }
+    Ok(dd)
 }
 
 fn generate_keys(num_validators: u64) -> Result<Vec<PrivateKey>> {
@@ -480,14 +867,20 @@ fn generate_keys(num_validators: u64) -> Result<Vec<PrivateKey>> {
     Ok(secrets)
 }
 
-fn get_operators(num_nodes: u64, cluster_dir: impl AsRef<Path>) -> Result<(Vec<Operator>, Vec<SecretKey>)> {
+fn get_operators(
+    num_nodes: u64,
+    cluster_dir: impl AsRef<Path>,
+) -> Result<(Vec<Operator>, Vec<SecretKey>)> {
     let mut ops = Vec::new();
     let mut node_keys = Vec::new();
 
     for i in 0..num_nodes {
         let (record, identity_key) = new_peer(&cluster_dir, i)?;
 
-        ops.push(Operator { enr: record.to_string(), ..Default::default() });
+        ops.push(Operator {
+            enr: record.to_string(),
+            ..Default::default()
+        });
         node_keys.push(identity_key);
     }
 
@@ -549,10 +942,7 @@ async fn new_def_from_config(args: &CreateClusterArgs) -> Result<Definition> {
     ];
     let threshold = safe_threshold(num_nodes, args.threshold);
 
-    let name = args
-        .name
-        .clone()
-        .unwrap_or(String::new());
+    let name = args.name.clone().unwrap_or_default();
 
     let consensus_protocol = args.consensus_protocol.clone().unwrap_or_default();
 
@@ -599,7 +989,7 @@ fn get_tss_shares(
             let i_u64 = u64::try_from(i).expect("shares length should fit in u64 on all platforms");
             let idx =
                 u8::try_from(i).map_err(|_| CreateClusterError::ValueExceedsU8 { value: i_u64 })?;
-            secret_set[i - 1] = shares[&idx].clone();
+            secret_set[i.saturating_sub(1)] = shares[&idx];
         }
 
         splits.push(secret_set);
@@ -697,7 +1087,7 @@ fn validate_create_config(args: &CreateClusterArgs) -> Result<()> {
         });
     }
 
-    if args.deposit_amounts.len() > 0 {
+    if !args.deposit_amounts.is_empty() {
         let amount = eth2util::deposit::eths_to_gweis(&args.deposit_amounts);
 
         eth2util::deposit::verify_deposit_amounts(&amount, args.compounding)?;
@@ -712,7 +1102,7 @@ fn validate_create_config(args: &CreateClusterArgs) -> Result<()> {
         }
     }
 
-    if args.split_keys && !args.num_validators.is_none() {
+    if args.split_keys && args.num_validators.is_some() {
         return Err(CreateClusterError::CannotSpecifyNumValidatorsWithSplitKeys);
     } else if !args.split_keys && args.num_validators.is_none() && args.definition_file.is_none() {
         return Err(CreateClusterError::MissingNumValidatorsOrDefinitionFile);
@@ -725,7 +1115,7 @@ fn validate_create_config(args: &CreateClusterArgs) -> Result<()> {
     }
 
     if let Some(consensus_protocol) = &args.consensus_protocol
-        && !protocols::is_supported_protocol_name(&consensus_protocol)
+        && !protocols::is_supported_protocol_name(consensus_protocol)
     {
         return Err(CreateClusterError::UnsupportedConsensusProtocol {
             consensus_protocol: consensus_protocol.clone(),
@@ -743,9 +1133,7 @@ fn detect_node_dirs(cluster_dir: impl AsRef<Path>, node_amount: u64) -> Result<(
         if std::fs::exists(abs_path.join("cluster-lock.json"))
             .map_err(CreateClusterError::IoError)?
         {
-            return Err(
-                CreateClusterError::NodeDirectoryAlreadyExists { node_dir: abs_path }.into(),
-            );
+            return Err(CreateClusterError::NodeDirectoryAlreadyExists { node_dir: abs_path });
         }
     }
 
@@ -829,7 +1217,7 @@ async fn load_definition(
     def.verify_hashes()?;
 
     if def.num_validators == 0 {
-        return Err(CreateClusterError::NoValidatorsInDefinition.into());
+        return Err(CreateClusterError::NoValidatorsInDefinition);
     }
 
     Ok(def)
@@ -854,16 +1242,14 @@ fn validate_addresses(
         return Err(CreateClusterError::MismatchingFeeRecipientAddresses {
             num_validators,
             addresses: fee_recipient_addrs.len(),
-        }
-        .into());
+        });
     }
 
     if withdrawal_addrs.len() != num_validators_usize && withdrawal_addrs.len() != 1 {
         return Err(CreateClusterError::MismatchingWithdrawalAddresses {
             num_validators,
             addresses: withdrawal_addrs.len(),
-        }
-        .into());
+        });
     }
 
     let mut fee_addrs = fee_recipient_addrs.to_vec();
@@ -902,4 +1288,194 @@ fn safe_threshold(num_nodes: u64, threshold: Option<u64>) -> u64 {
             t
         }
     }
+}
+
+/// Builds the list of `DistValidator`s from the DV public keys, precomputed
+/// public shares, deposit data and validator registrations.
+fn get_validators(
+    dv_pubkeys: &[PublicKey],
+    pub_shares_sets: &[Vec<PublicKey>],
+    deposit_datas: &[Vec<DepositData>],
+    val_regs: Vec<BuilderRegistration>,
+) -> Result<Vec<DistValidator>> {
+    let mut deposit_datas_map: HashMap<PublicKey, Vec<DepositData>> = HashMap::new();
+    for amount_level in deposit_datas {
+        for dd in amount_level {
+            deposit_datas_map
+                .entry(dd.pub_key)
+                .or_default()
+                .push(dd.clone());
+        }
+    }
+
+    let mut vals = Vec::with_capacity(dv_pubkeys.len());
+
+    for (idx, dv_pubkey) in dv_pubkeys.iter().enumerate() {
+        // Public shares for this validator's nodes.
+        let pub_shares: Vec<Vec<u8>> = pub_shares_sets
+            .get(idx)
+            .map(|shares| shares.iter().map(|pk| pk.to_vec()).collect())
+            .unwrap_or_default();
+
+        // Builder registration — same index as the validator.
+        let builder_registration = val_regs
+            .get(idx)
+            .cloned()
+            .ok_or(CreateClusterError::ValidatorRegistrationNotFound { index: idx })?;
+
+        // Partial deposit data for this DV pubkey.
+        let partial_deposit_data = deposit_datas_map.remove(dv_pubkey).ok_or_else(|| {
+            CreateClusterError::DepositDataNotFound {
+                dv: hex::encode(dv_pubkey),
+            }
+        })?;
+
+        vals.push(DistValidator {
+            pub_key: dv_pubkey.to_vec(),
+            pub_shares,
+            partial_deposit_data,
+            builder_registration,
+        });
+    }
+
+    Ok(vals)
+}
+
+/// Aggregates BLS signatures over `message` produced by every private share
+/// across all validators, mirroring Go's `aggSign`.
+///
+/// `share_sets` — outer dimension is per-validator, inner is per-node private
+/// key share.
+fn agg_sign(share_sets: &[Vec<PrivateKey>], message: &[u8]) -> Result<Vec<u8>> {
+    use pluto_crypto::types::Signature;
+
+    let tbls = BlstImpl;
+    let mut sigs: Vec<Signature> = Vec::new();
+
+    for shares in share_sets {
+        for share in shares {
+            let sig = tbls
+                .sign(share, message)
+                .map_err(CreateClusterError::CryptoError)?;
+            sigs.push(sig);
+        }
+    }
+
+    if sigs.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let agg = tbls
+        .aggregate(&sigs)
+        .map_err(CreateClusterError::CryptoError)?;
+    Ok(agg.to_vec())
+}
+
+/// Writes `cluster-lock.json` to every node directory under `cluster_dir`.
+/// The file is created with 0o400 (owner read-only) permissions.
+async fn write_lock(lock: &Lock, cluster_dir: impl AsRef<Path>, num_nodes: u64) -> Result<()> {
+    let json = serde_json::to_string_pretty(lock)?;
+    let bytes = json.into_bytes();
+
+    for i in 0..num_nodes {
+        let lock_path = node_dir(cluster_dir.as_ref(), i).join("cluster-lock.json");
+
+        tokio::fs::write(&lock_path, &bytes)
+            .await
+            .map_err(CreateClusterError::IoError)?;
+
+        let perms = std::fs::Permissions::from_mode(0o400);
+        tokio::fs::set_permissions(&lock_path, perms)
+            .await
+            .map_err(CreateClusterError::IoError)?;
+    }
+
+    Ok(())
+}
+
+fn write_output(
+    w: &mut dyn Write,
+    split_keys: bool,
+    cluster_dir: impl AsRef<Path>,
+    num_nodes: u64,
+    keys_to_disk: bool,
+    zipped: bool,
+) -> Result<()> {
+    let abs_cluster_dir =
+        std::path::absolute(cluster_dir.as_ref()).map_err(CreateClusterError::AbsolutePathError)?;
+    let abs_str = abs_cluster_dir.display().to_string();
+    let abs_str = abs_str.trim_end_matches('/');
+
+    writeln!(w, "Created charon cluster:").map_err(CreateClusterError::IoError)?;
+    writeln!(w, " --split-existing-keys={}", split_keys).map_err(CreateClusterError::IoError)?;
+    writeln!(w).map_err(CreateClusterError::IoError)?;
+    writeln!(w, "{}/", abs_str).map_err(CreateClusterError::IoError)?;
+    writeln!(
+        w,
+        "├─ node[0-{}]/\t\t\tDirectory for each node",
+        num_nodes.saturating_sub(1)
+    )
+    .map_err(CreateClusterError::IoError)?;
+    writeln!(
+        w,
+        "│  ├─ charon-enr-private-key\tCharon networking private key for node authentication"
+    )
+    .map_err(CreateClusterError::IoError)?;
+    writeln!(w, "│  ├─ cluster-lock.json\t\tCluster lock defines the cluster lock file which is signed by all nodes").map_err(CreateClusterError::IoError)?;
+    writeln!(w, "│  ├─ deposit-data-*.json\tDeposit data files are used to activate a Distributed Validator on the DV Launchpad").map_err(CreateClusterError::IoError)?;
+    if keys_to_disk {
+        writeln!(
+            w,
+            "│  ├─ validator_keys\t\tValidator keystores and password"
+        )
+        .map_err(CreateClusterError::IoError)?;
+        writeln!(
+            w,
+            "│  │  ├─ keystore-*.json\tValidator private share key for duty signing"
+        )
+        .map_err(CreateClusterError::IoError)?;
+        writeln!(
+            w,
+            "│  │  ├─ keystore-*.txt\t\tKeystore password files for keystore-*.json"
+        )
+        .map_err(CreateClusterError::IoError)?;
+    }
+    if zipped {
+        writeln!(w).map_err(CreateClusterError::IoError)?;
+        writeln!(w, "Files compressed and archived to:").map_err(CreateClusterError::IoError)?;
+        writeln!(w, "{}/cluster.tar.gz", abs_str).map_err(CreateClusterError::IoError)?;
+    }
+
+    Ok(())
+}
+
+fn write_split_keys_warning(w: &mut dyn Write) -> Result<()> {
+    writeln!(w).map_err(CreateClusterError::IoError)?;
+    writeln!(
+        w,
+        "***************** WARNING: Splitting keys **********************"
+    )
+    .map_err(CreateClusterError::IoError)?;
+    writeln!(
+        w,
+        " Please make sure any existing validator has been shut down for"
+    )
+    .map_err(CreateClusterError::IoError)?;
+    writeln!(
+        w,
+        " at least 2 finalised epochs before starting the charon cluster,"
+    )
+    .map_err(CreateClusterError::IoError)?;
+    writeln!(
+        w,
+        " otherwise slashing could occur.                               "
+    )
+    .map_err(CreateClusterError::IoError)?;
+    writeln!(
+        w,
+        "****************************************************************"
+    )
+    .map_err(CreateClusterError::IoError)?;
+    writeln!(w).map_err(CreateClusterError::IoError)?;
+    Ok(())
 }
