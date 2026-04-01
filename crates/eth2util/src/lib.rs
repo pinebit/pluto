@@ -13,6 +13,9 @@ pub mod rlp;
 /// EIP712 utilities.
 pub mod eip712;
 
+/// SSZ hash helpers.
+pub mod hash;
+
 /// Network utilities.
 pub mod network;
 
