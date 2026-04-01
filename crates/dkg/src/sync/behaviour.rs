@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{HashMap, VecDeque},
     task::{Context, Poll},
 };
 
@@ -27,7 +27,6 @@ pub struct Behaviour {
     clients: HashMap<PeerId, Client>,
     p2p_context: P2PContext,
     command_rx: mpsc::UnboundedReceiver<Command>,
-    pending_dials: HashSet<PeerId>,
     pending_events: VecDeque<ToSwarm<Event, THandlerInEvent<Self>>>,
 }
 
@@ -47,7 +46,6 @@ impl Behaviour {
                 .collect(),
             p2p_context,
             command_rx,
-            pending_dials: HashSet::new(),
             pending_events: VecDeque::new(),
         }
     }
@@ -77,7 +75,6 @@ impl Behaviour {
                         .peer_store_lock()
                         .connections_to_peer(&peer_id)
                         .is_empty()
-                        || !self.pending_dials.insert(peer_id)
                     {
                         return;
                     }
@@ -120,9 +117,6 @@ impl NetworkBehaviour for Behaviour {
 
     fn on_swarm_event(&mut self, event: FromSwarm) {
         match event {
-            FromSwarm::ConnectionEstablished(event) => {
-                self.pending_dials.remove(&event.peer_id);
-            }
             FromSwarm::ConnectionClosed(event) => {
                 if event.remaining_established > 0 {
                     return;
@@ -131,16 +125,9 @@ impl NetworkBehaviour for Behaviour {
                 // TODO: Go retries sync client connections until reconnect is disabled.
                 // Re-queue active clients here (and on DialFailure below) so peers that
                 // restart before initial cluster sync can be dialed again.
-                self.pending_dials.remove(&event.peer_id);
-
                 if let Some(client) = self.clients.get(&event.peer_id) {
                     client.set_connected(false);
                     client.release_outbound();
-                }
-            }
-            FromSwarm::DialFailure(event) => {
-                if let Some(peer_id) = event.peer_id {
-                    self.pending_dials.remove(&peer_id);
                 }
             }
             _ => {}
