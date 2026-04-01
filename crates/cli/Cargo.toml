@@ -18,6 +18,7 @@ hex.workspace = true
 humantime.workspace = true
 tokio.workspace = true
 pluto-app.workspace = true
+pluto-eth1wrap.workspace = true
 pluto-cluster.workspace = true
 pluto-relay-server.workspace = true
 pluto-tracing.workspace = true

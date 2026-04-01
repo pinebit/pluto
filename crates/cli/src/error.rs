@@ -94,4 +94,24 @@ pub enum CliError {
     /// Relay P2P error.
     #[error("Relay P2P error: {0}")]
     RelayP2PError(#[from] pluto_relay_server::error::RelayP2PError),
+
+    /// Deposit validation error.
+    #[error("{0}")]
+    Deposit(#[from] pluto_eth2util::deposit::DepositError),
+
+    /// Network error.
+    #[error("{0}")]
+    Network(#[from] pluto_eth2util::network::NetworkError),
+
+    /// Cluster definition error.
+    #[error("{0}")]
+    Definition(#[from] pluto_cluster::definition::DefinitionError),
+
+    /// EIP-712 error.
+    #[error("{0}")]
+    Eip712(#[from] pluto_cluster::eip712sigs::EIP712Error),
+
+    /// Ethereum L1 client error.
+    #[error("{0}")]
+    Eth1Client(#[from] pluto_eth1wrap::EthClientError),
 }
