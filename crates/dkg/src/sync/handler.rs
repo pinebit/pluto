@@ -261,7 +261,6 @@ impl ConnectionHandler for Handler {
 }
 
 async fn run_outbound_stream(client: Client, mut stream: Stream) -> OutboundExit {
-    let mut first = true;
     let mut interval = tokio::time::interval(client.period());
     let hash_signature = prost::bytes::Bytes::from(client.hash_sig().to_vec());
     let version = client.version().to_string();
@@ -269,11 +268,7 @@ async fn run_outbound_stream(client: Client, mut stream: Stream) -> OutboundExit
     client.set_connected(true);
 
     loop {
-        if first {
-            first = false;
-        } else {
-            interval.tick().await;
-        }
+        interval.tick().await;
 
         let shutdown = client.shutdown_requested();
         let timestamp = match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
@@ -293,11 +288,16 @@ async fn run_outbound_stream(client: Client, mut stream: Stream) -> OutboundExit
             step: client.step(),
         };
 
-        let response = async {
-            protocol::write_sync_request(&mut stream, &request).await?;
-            protocol::read_sync_response(&mut stream).await
-        }
-        .await;
+        let response: Result<MsgSyncResponse> =
+            match pluto_p2p::proto::write_fixed_size_protobuf(&mut stream, &request)
+                .await
+                .map_err(Error::io)
+            {
+                Ok(()) => pluto_p2p::proto::read_fixed_size_protobuf(&mut stream)
+                    .await
+                    .map_err(Error::io),
+                Err(error) => Err(error),
+            };
 
         let response = match response {
             Ok(response) => response,
@@ -335,7 +335,9 @@ async fn handle_inbound_stream(peer_id: PeerId, server: Server, mut stream: Stre
     let public_key = pluto_p2p::peer::peer_id_to_libp2p_pk(&peer_id).map_err(Error::peer)?;
 
     loop {
-        let message = protocol::read_sync_request(&mut stream).await?;
+        let message: MsgSync = pluto_p2p::proto::read_fixed_size_protobuf(&mut stream)
+            .await
+            .map_err(Error::io)?;
         let mut response = MsgSyncResponse {
             sync_timestamp: message.timestamp,
             error: String::new(),
@@ -367,7 +369,9 @@ async fn handle_inbound_stream(peer_id: PeerId, server: Server, mut stream: Stre
 
         server.update_step(peer_id, message.step).await?;
 
-        protocol::write_sync_response(&mut stream, &response).await?;
+        pluto_p2p::proto::write_fixed_size_protobuf(&mut stream, &response)
+            .await
+            .map_err(Error::io)?;
 
         if message.shutdown {
             server.set_shutdown(peer_id).await;

@@ -7,11 +7,6 @@ use unsigned_varint::aio::read_usize;
 /// Default maximum protobuf message size
 pub const MAX_MESSAGE_SIZE: usize = 128 << 20;
 
-/// Error returned when a fixed-size frame uses a negative length prefix.
-#[derive(Debug, thiserror::Error)]
-#[error("invalid fixed-size frame length: {0}")]
-pub struct InvalidFixedSizeLength(pub i64);
-
 /// Writes a length-delimited payload to the stream.
 ///
 /// Format: `[unsigned varint length][payload bytes]`
@@ -78,7 +73,7 @@ pub async fn read_fixed_size_delimited<S: AsyncRead + Unpin>(
     if len < 0 {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
-            InvalidFixedSizeLength(len),
+            format!("invalid data length"),
         ));
     }
 
@@ -102,6 +97,18 @@ pub async fn write_protobuf<M: Message, S: AsyncWrite + Unpin>(
     write_length_delimited(stream, &buf).await
 }
 
+/// Encodes a protobuf message and writes it with fixed-size framing.
+pub async fn write_fixed_size_protobuf<M: Message, S: AsyncWrite + Unpin>(
+    stream: &mut S,
+    msg: &M,
+) -> io::Result<()> {
+    let mut buf = Vec::with_capacity(msg.encoded_len());
+    msg.encode(&mut buf)
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+
+    write_fixed_size_delimited(stream, &buf).await
+}
+
 /// Reads a protobuf message using the default maximum message size.
 pub async fn read_protobuf<M: Message + Default, S: AsyncRead + Unpin>(
     stream: &mut S,
@@ -115,6 +122,14 @@ pub async fn read_protobuf_with_max_size<M: Message + Default, S: AsyncRead + Un
     max_message_size: usize,
 ) -> io::Result<M> {
     let buf = read_length_delimited(stream, max_message_size).await?;
+    M::decode(&buf[..]).map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
+}
+
+/// Reads a protobuf message using fixed-size framing.
+pub async fn read_fixed_size_protobuf<M: Message + Default, S: AsyncRead + Unpin>(
+    stream: &mut S,
+) -> io::Result<M> {
+    let buf = read_fixed_size_delimited(stream).await?;
     M::decode(&buf[..]).map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
 }
 
@@ -148,11 +163,6 @@ mod tests {
         let error = read_fixed_size_delimited(&mut cursor)
             .await
             .expect_err("negative sizes must fail");
-        let size = error
-            .get_ref()
-            .and_then(|source| source.downcast_ref::<InvalidFixedSizeLength>())
-            .map(|error| error.0);
-
-        assert_eq!(size, Some(-1));
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
     }
 }

@@ -51,10 +51,6 @@ pub enum Error {
     #[error("protocol negotiation failed")]
     Unsupported,
 
-    /// A message length prefix was invalid.
-    #[error("invalid sized protobuf length: {0}")]
-    InvalidMessageLength(i64),
-
     /// Failed to parse the peer version.
     #[error("parse peer version: {0}")]
     ParsePeerVersion(String),
