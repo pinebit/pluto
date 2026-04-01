@@ -5561,6 +5561,7 @@ name = "pluto-dkg"
 version = "1.7.1"
 dependencies = [
  "anyhow",
+ "bon",
  "clap",
  "either",
  "futures",

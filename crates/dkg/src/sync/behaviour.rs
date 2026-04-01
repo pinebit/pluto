@@ -197,6 +197,7 @@ mod tests {
     use tokio::sync::mpsc;
 
     use super::*;
+    use crate::sync::ClientConfig;
 
     fn test_behaviour(client: Client) -> Behaviour {
         let (_unused_tx, command_rx) = mpsc::unbounded_channel();
@@ -215,12 +216,12 @@ mod tests {
         let (command_tx, command_rx) = mpsc::unbounded_channel();
         let version = SemVer::parse("v1.7").expect("valid version");
         let peer_id = PeerId::random();
-        let client = Client::new_wired(
+        let client = Client::new(
             peer_id,
             vec![1, 2, 3],
             version.clone(),
             Default::default(),
-            command_tx,
+            Some(command_tx),
         );
         let server = Server::new(1, vec![1, 2, 3], version);
         let p2p_context = P2PContext::new([peer_id]);
@@ -243,7 +244,13 @@ mod tests {
     fn connection_closed_keeps_client_state_until_last_connection() {
         let version = SemVer::parse("v1.7").expect("valid version");
         let peer_id = PeerId::random();
-        let client = Client::new(peer_id, vec![1, 2, 3], version);
+        let client = Client::new(
+            peer_id,
+            vec![1, 2, 3],
+            version,
+            ClientConfig::default(),
+            None,
+        );
         client.set_connected(true);
         assert!(client.try_claim_outbound());
 

@@ -43,12 +43,12 @@ pub fn new(
         .into_iter()
         .filter(|peer_id| *peer_id != local_peer_id)
         .map(|peer_id| {
-            Client::new_wired(
+            Client::new(
                 peer_id,
                 hash_sig.clone(),
                 version.clone(),
                 ClientConfig::default(),
-                command_tx.clone(),
+                Some(command_tx.clone()),
             )
         })
         .collect::<Vec<_>>();

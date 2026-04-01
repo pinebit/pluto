@@ -6,6 +6,7 @@ use std::{
     time::Duration,
 };
 
+use bon::Builder;
 use libp2p::PeerId;
 use pluto_core::version::SemVer;
 use tokio::sync::{mpsc, watch};
@@ -18,34 +19,33 @@ use super::error::{Error, Result};
 pub const DEFAULT_PERIOD: Duration = Duration::from_millis(100);
 
 /// Configuration for a sync client.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Builder)]
 pub struct ClientConfig {
     /// Period between sync messages.
+    #[builder(default = DEFAULT_PERIOD)]
     pub period: Duration,
 }
 
 impl Default for ClientConfig {
     fn default() -> Self {
-        Self {
-            period: DEFAULT_PERIOD,
-        }
+        Self::builder().build()
     }
 }
 
 #[derive(Debug)]
 struct ClientInner {
+    active: AtomicBool,
+    connected: AtomicBool,
+    reconnect: AtomicBool,
+    step: AtomicI64,
+    shutdown_requested: AtomicBool,
+    finished: AtomicBool,
+    outbound_claimed: AtomicBool,
+    done_tx: watch::Sender<Option<Result<()>>>,
     peer_id: PeerId,
     hash_sig: Vec<u8>,
     version: SemVer,
     period: Duration,
-    active: AtomicBool,
-    connected: AtomicBool,
-    reconnect: AtomicBool,
-    shutdown_requested: AtomicBool,
-    finished: AtomicBool,
-    outbound_claimed: AtomicBool,
-    step: AtomicI64,
-    done_tx: watch::Sender<Option<Result<()>>>,
     command_tx: Option<mpsc::UnboundedSender<Command>>,
 }
 
@@ -56,32 +56,8 @@ pub struct Client {
 }
 
 impl Client {
-    /// Creates a new client with the default sync period.
-    pub fn new(peer_id: PeerId, hash_sig: Vec<u8>, version: SemVer) -> Self {
-        Self::new_with_config(peer_id, hash_sig, version, ClientConfig::default())
-    }
-
     /// Creates a new client with an explicit config.
-    pub fn new_with_config(
-        peer_id: PeerId,
-        hash_sig: Vec<u8>,
-        version: SemVer,
-        config: ClientConfig,
-    ) -> Self {
-        Self::new_with_command(peer_id, hash_sig, version, config, None)
-    }
-
-    pub(crate) fn new_wired(
-        peer_id: PeerId,
-        hash_sig: Vec<u8>,
-        version: SemVer,
-        config: ClientConfig,
-        command_tx: mpsc::UnboundedSender<Command>,
-    ) -> Self {
-        Self::new_with_command(peer_id, hash_sig, version, config, Some(command_tx))
-    }
-
-    fn new_with_command(
+    pub(crate) fn new(
         peer_id: PeerId,
         hash_sig: Vec<u8>,
         version: SemVer,
@@ -91,18 +67,18 @@ impl Client {
         let (done_tx, _done_rx) = watch::channel(None);
         Self {
             inner: Arc::new(ClientInner {
+                active: AtomicBool::new(false),
+                connected: AtomicBool::new(false),
+                reconnect: AtomicBool::new(true),
+                step: AtomicI64::new(0),
+                shutdown_requested: AtomicBool::new(false),
+                finished: AtomicBool::new(false),
+                outbound_claimed: AtomicBool::new(false),
+                done_tx,
                 peer_id,
                 hash_sig,
                 version,
                 period: config.period,
-                active: AtomicBool::new(false),
-                connected: AtomicBool::new(false),
-                reconnect: AtomicBool::new(true),
-                shutdown_requested: AtomicBool::new(false),
-                finished: AtomicBool::new(false),
-                outbound_claimed: AtomicBool::new(false),
-                step: AtomicI64::new(0),
-                done_tx,
                 command_tx,
             }),
         }
