@@ -1,7 +1,5 @@
 //! Wire protocol helpers for the DKG sync protocol.
 
-use std::io;
-
 use futures::{AsyncRead, AsyncWrite};
 use libp2p::{
     Stream,
@@ -53,7 +51,15 @@ where
 {
     let buf = proto::read_fixed_size_delimited(reader)
         .await
-        .map_err(map_fixed_size_read_error)?;
+        .map_err(|error| {
+            if let Some(source) = error.get_ref()
+                && let Some(length) = source.downcast_ref::<InvalidFixedSizeLength>()
+            {
+                return Error::InvalidMessageLength(length.0);
+            }
+
+            Error::io(error)
+        })?;
     M::decode(buf.as_slice()).map_err(Error::decode)
 }
 
@@ -97,17 +103,6 @@ pub fn validate_request_with_public_key(
 
     Ok(())
 }
-
-fn map_fixed_size_read_error(error: io::Error) -> Error {
-    if let Some(source) = error.get_ref()
-        && let Some(length) = source.downcast_ref::<InvalidFixedSizeLength>()
-    {
-        return Error::InvalidMessageLength(length.0);
-    }
-
-    Error::io(error)
-}
-
 #[cfg(test)]
 mod tests {
     use futures::{AsyncWriteExt, io::Cursor};

@@ -181,11 +181,11 @@ impl Server {
     }
 
     pub(crate) async fn mark_connected(&self, peer_id: PeerId) -> (bool, usize) {
-        self.mutate_state(|state| {
-            let inserted = state.connected.insert(peer_id);
-            (inserted, state.connected.len())
-        })
-        .await
+        let mut state = self.inner.state.write().await;
+        let inserted = state.connected.insert(peer_id);
+        let count = state.connected.len();
+        self.inner.notify.notify_waiters();
+        (inserted, count)
     }
 
     pub(crate) async fn clear_connected(&self, peer_id: PeerId) {
@@ -211,47 +211,37 @@ impl Server {
 
     pub(crate) async fn update_step(&self, peer_id: PeerId, step: i64) -> Result<()> {
         let mut state = self.inner.state.write().await;
-        let current = state.steps.get(&peer_id).copied();
+        match state.steps.get(&peer_id).copied() {
+            Some(current) => {
+                if step < current {
+                    return Err(Error::PeerStepBehind);
+                }
 
-        if let Some(current) = current
-            && step < current
-        {
-            return Err(Error::PeerStepBehind);
-        }
-
-        let current_plus_two = current
-            .map(|current| {
-                current
+                let current_plus_two = current
                     .checked_add(2)
-                    .ok_or_else(|| Error::message("step overflow"))
-            })
-            .transpose()?;
+                    .ok_or_else(|| Error::message("step overflow"))?;
+                if step > current_plus_two {
+                    return Err(Error::PeerStepAhead);
+                }
 
-        if let Some(current_plus_two) = current_plus_two
-            && step > current_plus_two
-        {
-            return Err(Error::PeerStepAhead);
-        }
-
-        if current.is_none() && !(0..=1).contains(&step) {
-            return Err(Error::AbnormalInitialStep);
-        }
-
-        if current == Some(step) {
-            return Ok(());
+                if step == current {
+                    return Ok(());
+                }
+            }
+            None if !(0..=1).contains(&step) => {
+                return Err(Error::AbnormalInitialStep);
+            }
+            None => {}
         }
 
         state.steps.insert(peer_id, step);
-        drop(state);
         self.inner.notify.notify_waiters();
         Ok(())
     }
 
-    async fn mutate_state<T>(&self, mutate: impl FnOnce(&mut ServerState) -> T) -> T {
+    async fn mutate_state(&self, mutate: impl FnOnce(&mut ServerState)) {
         let mut state = self.inner.state.write().await;
-        let result = mutate(&mut state);
-        drop(state);
+        mutate(&mut state);
         self.inner.notify.notify_waiters();
-        result
     }
 }

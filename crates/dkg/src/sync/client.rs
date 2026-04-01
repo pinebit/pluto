@@ -34,6 +34,10 @@ impl Default for ClientConfig {
 
 #[derive(Debug)]
 struct ClientInner {
+    peer_id: PeerId,
+    hash_sig: Vec<u8>,
+    version: SemVer,
+    period: Duration,
     active: AtomicBool,
     connected: AtomicBool,
     reconnect: AtomicBool,
@@ -42,10 +46,6 @@ struct ClientInner {
     finished: AtomicBool,
     outbound_claimed: AtomicBool,
     done_tx: watch::Sender<Option<Result<()>>>,
-    peer_id: PeerId,
-    hash_sig: Vec<u8>,
-    version: SemVer,
-    period: Duration,
     command_tx: Option<mpsc::UnboundedSender<Command>>,
 }
 
@@ -67,6 +67,10 @@ impl Client {
         let (done_tx, _done_rx) = watch::channel(None);
         Self {
             inner: Arc::new(ClientInner {
+                peer_id,
+                hash_sig,
+                version,
+                period: config.period,
                 active: AtomicBool::new(false),
                 connected: AtomicBool::new(false),
                 reconnect: AtomicBool::new(true),
@@ -75,18 +79,9 @@ impl Client {
                 finished: AtomicBool::new(false),
                 outbound_claimed: AtomicBool::new(false),
                 done_tx,
-                peer_id,
-                hash_sig,
-                version,
-                period: config.period,
                 command_tx,
             }),
         }
-    }
-
-    /// Returns the target peer for this client.
-    pub fn peer_id(&self) -> PeerId {
-        self.inner.peer_id
     }
 
     /// Runs the client until shutdown, fatal error, or cancellation.
@@ -116,12 +111,16 @@ impl Client {
         self.inner.reconnect.store(false, Ordering::SeqCst);
     }
 
-    pub(crate) fn version(&self) -> &SemVer {
-        &self.inner.version
+    pub(crate) fn peer_id(&self) -> PeerId {
+        self.inner.peer_id
     }
 
     pub(crate) fn hash_sig(&self) -> &[u8] {
         &self.inner.hash_sig
+    }
+
+    pub(crate) fn version(&self) -> &SemVer {
+        &self.inner.version
     }
 
     pub(crate) fn period(&self) -> Duration {

@@ -84,21 +84,11 @@ impl Handler {
         self.backoff = self.backoff.saturating_mul(2).min(MAX_BACKOFF);
     }
 
-    fn reset_backoff(&mut self) {
-        self.backoff = INITIAL_BACKOFF;
-    }
-
-    fn wants_outbound(&self) -> bool {
-        self.client
-            .as_ref()
-            .is_some_and(|client| client.should_run())
-    }
-
     fn try_request_outbound(
         &mut self,
     ) -> Option<ConnectionHandlerEvent<ReadyUpgrade<StreamProtocol>, (), Infallible>> {
         let client = self.client.as_ref()?;
-        if !self.wants_outbound() || !client.try_claim_outbound() {
+        if !client.should_run() || !client.try_claim_outbound() {
             return None;
         }
 
@@ -257,7 +247,7 @@ impl ConnectionHandler for Handler {
                 };
 
                 stream.ignore_for_keep_alive();
-                self.reset_backoff();
+                self.backoff = INITIAL_BACKOFF;
                 self.outbound = OutboundState::Running(run_outbound_stream(client, stream).boxed());
             }
             ConnectionEvent::DialUpgradeError(error) => self.on_dial_upgrade_error(error),

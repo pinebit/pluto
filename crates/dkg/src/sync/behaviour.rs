@@ -52,36 +52,16 @@ impl Behaviour {
         }
     }
 
-    fn new_handler(&self, peer: PeerId) -> Handler {
-        Handler::new(peer, self.server.clone(), self.clients.get(&peer).cloned())
-    }
-
     fn connection_handler_for_peer(&self, peer: PeerId) -> THandler<Self> {
         if self.clients.contains_key(&peer) {
-            Either::Left(self.new_handler(peer))
+            Either::Left(Handler::new(
+                peer,
+                self.server.clone(),
+                self.clients.get(&peer).cloned(),
+            ))
         } else {
             Either::Right(dummy::ConnectionHandler)
         }
-    }
-
-    fn is_connected(&self, peer_id: &PeerId) -> bool {
-        !self
-            .p2p_context
-            .peer_store_lock()
-            .connections_to_peer(peer_id)
-            .is_empty()
-    }
-
-    fn queue_dial(&mut self, peer_id: PeerId) {
-        if self.is_connected(&peer_id) || !self.pending_dials.insert(peer_id) {
-            return;
-        }
-
-        self.pending_events.push_back(ToSwarm::Dial {
-            opts: DialOpts::peer_id(peer_id)
-                .condition(PeerCondition::DisconnectedAndNotDialing)
-                .build(),
-        });
     }
 
     fn handle_command(&mut self, command: Command) {
@@ -92,7 +72,21 @@ impl Behaviour {
                 };
 
                 if client.should_run() && !client.is_connected() {
-                    self.queue_dial(peer_id);
+                    if !self
+                        .p2p_context
+                        .peer_store_lock()
+                        .connections_to_peer(&peer_id)
+                        .is_empty()
+                        || !self.pending_dials.insert(peer_id)
+                    {
+                        return;
+                    }
+
+                    self.pending_events.push_back(ToSwarm::Dial {
+                        opts: DialOpts::peer_id(peer_id)
+                            .condition(PeerCondition::DisconnectedAndNotDialing)
+                            .build(),
+                    });
                 }
             }
         }
