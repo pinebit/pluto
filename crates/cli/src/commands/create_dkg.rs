@@ -17,7 +17,7 @@ use pluto_eth2util::{
     deposit::{eths_to_gweis, verify_deposit_amounts},
     enr::Record,
     helpers::{checksum_address, public_key_to_address},
-    network::{PRATER, network_to_fork_version, valid_network},
+    network::{GOERLI, PRATER, network_to_fork_version, valid_network},
 };
 use tracing::{info, warn};
 
@@ -118,6 +118,10 @@ pub struct CreateDkgArgs {
 
 /// Runs the create dkg command.
 pub async fn run(args: CreateDkgArgs) -> Result<()> {
+    run_create_dkg(parse_args(args)?).await
+}
+
+fn parse_args(args: CreateDkgArgs) -> Result<CreateDkgArgs> {
     if args.threshold != 0 {
         if args.threshold < MIN_THRESHOLD {
             return Err(CliError::Other(
@@ -151,20 +155,20 @@ pub async fn run(args: CreateDkgArgs) -> Result<()> {
         ));
     }
 
-    run_create_dkg(args).await
+    Ok(args)
 }
 
 async fn run_create_dkg(mut args: CreateDkgArgs) -> Result<()> {
     // Map prater to goerli to ensure backwards compatibility with older cluster
     // definitions.
     if args.network == PRATER {
-        args.network = "goerli".to_string();
+        args.network = GOERLI.name.to_string();
     }
 
-    let operators_len = if !args.operator_enrs.is_empty() {
-        args.operator_enrs.len()
-    } else {
+    let operators_len = if args.operator_enrs.is_empty() {
         args.operator_addresses.len()
+    } else {
+        args.operator_enrs.len()
     };
 
     validate_dkg_config(
@@ -183,7 +187,7 @@ async fn run_create_dkg(mut args: CreateDkgArgs) -> Result<()> {
 
     validate_withdrawal_addrs(&withdrawal_addrs, &args.network)?;
 
-    info!("Charon create DKG starting");
+    info!("Pluto create DKG starting");
 
     let def_path = args.output_dir.join("cluster-definition.json");
     if def_path.exists() {
@@ -231,6 +235,7 @@ async fn run_create_dkg(mut args: CreateDkgArgs) -> Result<()> {
     let fork_version_hex = network_to_fork_version(&args.network)?;
 
     let (priv_key, creator) = if args.publish {
+        // Temporary creator address
         let key = SecretKey::random(&mut OsRng);
         let addr = public_key_to_address(&key.public_key());
         (
@@ -262,7 +267,6 @@ async fn run_create_dkg(mut args: CreateDkgArgs) -> Result<()> {
         vec![],
     )?;
 
-    // Apply DKG algorithm override (mirrors Go's cluster.WithDKGAlgorithm).
     def.dkg_algorithm = args.dkg_algo.clone();
     def.set_definition_hashes()?;
 
@@ -293,6 +297,8 @@ async fn run_create_dkg(mut args: CreateDkgArgs) -> Result<()> {
     perms.set_readonly(true);
     let _ = tokio::fs::set_permissions(&def_path, perms).await;
 
+    info!("Cluster definition created: {}", def_path.display());
+
     Ok(())
 }
 
@@ -304,9 +310,9 @@ fn validate_dkg_config(
     compounding: bool,
 ) -> Result<()> {
     if num_operators < MIN_NODES {
-        return Err(CliError::Other(
-            "number of operators is below minimum".to_string(),
-        ));
+        return Err(CliError::Other(format!(
+            "number of operators is below minimum: got {num_operators}, need at least {MIN_NODES} via --operator-enrs or --operator-addresses",
+        )));
     }
 
     if !valid_network(network) {
@@ -567,12 +573,12 @@ mod tests {
     )]
     #[test_case(
         CreateDkgArgs { operator_enrs: vec!["".to_string()], ..default_args() },
-        "number of operators is below minimum" ;
+        "number of operators is below minimum: got 1, need at least 3 via --operator-enrs or --operator-addresses" ;
         "single_empty_enr"
     )]
     #[test_case(
         CreateDkgArgs { ..default_args() },
-        "number of operators is below minimum" ;
+        "number of operators is below minimum: got 0, need at least 3 via --operator-enrs or --operator-addresses" ;
         "no_operators"
     )]
     #[test_case(
@@ -616,7 +622,10 @@ mod tests {
             withdrawal_addresses: vec!["0xa6430105220d0b29688b734b8ea0f3ca9936e846".to_string()],
             ..default_args()
         }).await.unwrap_err();
-        assert_eq!(err.to_string(), "number of operators is below minimum");
+        assert_eq!(
+            err.to_string(),
+            "number of operators is below minimum: got 1, need at least 3 via --operator-enrs or --operator-addresses"
+        );
     }
 
     #[tokio::test]
