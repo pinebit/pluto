@@ -104,9 +104,9 @@ impl TestCaseMev {
 
     async fn run(&self, token: &CancellationToken, conf: &TestMevArgs, target: &str) -> TestResult {
         match self {
-            TestCaseMev::Ping => mev_ping_test(token, conf, target).await,
-            TestCaseMev::PingMeasure => mev_ping_measure_test(token, conf, target).await,
-            TestCaseMev::CreateBlock => mev_create_block_test(token, conf, target).await,
+            TestCaseMev::Ping => mev_ping_test(target, conf, token).await,
+            TestCaseMev::PingMeasure => mev_ping_measure_test(target, conf, token).await,
+            TestCaseMev::CreateBlock => mev_create_block_test(target, conf, token).await,
         }
     }
 }
@@ -216,22 +216,21 @@ async fn test_single_mev(
     target: &str,
     token: CancellationToken,
 ) -> Vec<TestResult> {
-    let runner_queued_tests = queued_tests.to_vec();
-
     let mut join_set = JoinSet::new();
-    for test_case in runner_queued_tests {
-        let runner_token = token.clone();
+
+    for test_case in queued_tests.to_owned() {
+        let token = token.clone();
         let conf = conf.clone();
         let target = target.to_string();
 
         join_set.spawn(async move {
             let tc_name = test_case.test_case_name();
             tokio::select! {
-                _ = runner_token.cancelled() => {
+                _ = token.cancelled() => {
                     let tr = TestResult::new(&tc_name.name);
                     tr.fail(TestResultError::from_string("timeout/interrupted"))
                 }
-                r = test_case.run(&runner_token, &conf, &target) => {
+                r = test_case.run(&token, &conf, &target) => {
                     r
                 }
             }
@@ -241,7 +240,7 @@ async fn test_single_mev(
     join_set.join_all().await
 }
 
-async fn mev_ping_test(token: &CancellationToken, _conf: &TestMevArgs, target: &str) -> TestResult {
+async fn mev_ping_test(target: &str, _conf: &TestMevArgs, token: &CancellationToken) -> TestResult {
     let test_res = TestResult::new("Ping");
     let url = format!("{target}/eth/v1/builder/status");
     let client = reqwest::Client::new();
@@ -267,9 +266,9 @@ async fn mev_ping_test(token: &CancellationToken, _conf: &TestMevArgs, target: &
 }
 
 async fn mev_ping_measure_test(
-    token: &CancellationToken,
-    _conf: &TestMevArgs,
     target: &str,
+    _conf: &TestMevArgs,
+    token: &CancellationToken,
 ) -> TestResult {
     let test_res = TestResult::new("PingMeasure");
     let url = format!("{target}/eth/v1/builder/status");
@@ -291,9 +290,9 @@ async fn mev_ping_measure_test(
 }
 
 async fn mev_create_block_test(
-    token: &CancellationToken,
-    conf: &TestMevArgs,
     target: &str,
+    conf: &TestMevArgs,
+    token: &CancellationToken,
 ) -> TestResult {
     let test_res = TestResult::new("CreateBlock");
 
