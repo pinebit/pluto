@@ -215,7 +215,7 @@ impl Server {
                     return Err(Error::PeerStepBehind);
                 }
 
-                let current_plus_two = current.checked_add(2).ok_or_else(|| Error::StepOverflow)?;
+                let current_plus_two = current.checked_add(2).ok_or(Error::StepOverflow)?;
                 if step > current_plus_two {
                     return Err(Error::PeerStepAhead);
                 }
