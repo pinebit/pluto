@@ -19,7 +19,27 @@ use super::{Command, client::Client, handler::Handler, server::Server};
 
 /// Event emitted by the sync behaviour.
 #[derive(Debug, Clone)]
-pub enum Event {}
+pub enum Event {
+    /// A peer advanced to a new sync step.
+    PeerStepUpdated {
+        /// The peer whose step was updated.
+        peer_id: PeerId,
+        /// The updated step.
+        step: i64,
+    },
+    /// A peer requested graceful shutdown through sync.
+    PeerShutdownObserved {
+        /// The peer that requested shutdown.
+        peer_id: PeerId,
+    },
+    /// A peer sent a sync message that failed.
+    SyncRejected {
+        /// The peer whose sync message was rejected.
+        peer_id: PeerId,
+        /// The validation error.
+        error: super::error::Error,
+    },
+}
 
 /// Swarm behaviour backing the DKG sync protocol.
 pub struct Behaviour {
@@ -141,7 +161,7 @@ impl NetworkBehaviour for Behaviour {
         event: THandlerOutEvent<Self>,
     ) {
         match event {
-            Either::Left(event) => match event {},
+            Either::Left(event) => self.pending_events.push_back(ToSwarm::GenerateEvent(event)),
             Either::Right(unreachable) => match unreachable {},
         }
     }

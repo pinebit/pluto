@@ -209,7 +209,7 @@ impl Server {
         .await;
     }
 
-    pub(crate) async fn update_step(&self, peer_id: PeerId, step: i64) -> Result<()> {
+    pub(crate) async fn update_step(&self, peer_id: PeerId, step: i64) -> Result<bool> {
         let mut state = self.inner.state.write().await;
         match state.steps.get(&peer_id).copied() {
             Some(current) => {
@@ -225,7 +225,7 @@ impl Server {
                 }
 
                 if step == current {
-                    return Ok(());
+                    return Ok(false);
                 }
             }
             None if !(0..=1).contains(&step) => {
@@ -236,7 +236,7 @@ impl Server {
 
         state.steps.insert(peer_id, step);
         self.inner.notify.notify_waiters();
-        Ok(())
+        Ok(true)
     }
 
     async fn mutate_state(&self, mutate: impl FnOnce(&mut ServerState)) {

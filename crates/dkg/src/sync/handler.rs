@@ -20,6 +20,7 @@ use libp2p::{
     },
 };
 use prost_types::Timestamp;
+use tokio::sync::mpsc;
 use tokio::time::Sleep;
 use tracing::{debug, info, warn};
 
@@ -30,12 +31,16 @@ use super::{
     error::{Error, Result},
     protocol,
     server::Server,
+    Event,
 };
 
 const INITIAL_BACKOFF: Duration = Duration::from_millis(100);
 const MAX_BACKOFF: Duration = Duration::from_secs(1);
 
 type InboundFuture = BoxFuture<'static, Result<()>>;
+
+/// Protocol-level events emitted by the sync handler.
+pub type OutEvent = Event;
 
 enum OutboundState {
     Idle,
@@ -57,6 +62,8 @@ pub struct Handler {
     server: Server,
     client: Option<Client>,
     inbound: Option<InboundFuture>,
+    inbound_events_tx: mpsc::UnboundedSender<OutEvent>,
+    inbound_events_rx: mpsc::UnboundedReceiver<OutEvent>,
     outbound: OutboundState,
     backoff: Duration,
 }
@@ -64,11 +71,14 @@ pub struct Handler {
 impl Handler {
     /// Creates a new handler for a single connection.
     pub fn new(peer_id: PeerId, server: Server, client: Option<Client>) -> Self {
+        let (inbound_events_tx, inbound_events_rx) = mpsc::unbounded_channel();
         Self {
             peer_id,
             server,
             client,
             inbound: None,
+            inbound_events_tx,
+            inbound_events_rx,
             outbound: OutboundState::Idle,
             backoff: INITIAL_BACKOFF,
         }
@@ -86,7 +96,7 @@ impl Handler {
 
     fn try_request_outbound(
         &mut self,
-    ) -> Option<ConnectionHandlerEvent<ReadyUpgrade<StreamProtocol>, (), Infallible>> {
+    ) -> Option<ConnectionHandlerEvent<ReadyUpgrade<StreamProtocol>, (), OutEvent>> {
         let client = self.client.as_ref()?;
         if !client.should_run() || !client.try_claim_outbound() {
             return None;
@@ -137,7 +147,7 @@ impl ConnectionHandler for Handler {
     type InboundProtocol = ReadyUpgrade<StreamProtocol>;
     type OutboundOpenInfo = ();
     type OutboundProtocol = ReadyUpgrade<StreamProtocol>;
-    type ToBehaviour = Infallible;
+    type ToBehaviour = OutEvent;
 
     fn listen_protocol(&self) -> SubstreamProtocol<Self::InboundProtocol> {
         self.substream_protocol()
@@ -153,6 +163,10 @@ impl ConnectionHandler for Handler {
     ) -> Poll<
         ConnectionHandlerEvent<Self::OutboundProtocol, Self::OutboundOpenInfo, Self::ToBehaviour>,
     > {
+        if let Poll::Ready(Some(event)) = self.inbound_events_rx.poll_recv(cx) {
+            return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(event));
+        }
+
         if let Some(inbound) = self.inbound.as_mut() {
             match inbound.poll_unpin(cx) {
                 Poll::Pending => {}
@@ -234,8 +248,15 @@ impl ConnectionHandler for Handler {
                 ..
             }) => {
                 stream.ignore_for_keep_alive();
-                self.inbound =
-                    Some(handle_inbound_stream(self.peer_id, self.server.clone(), stream).boxed());
+                self.inbound = Some(
+                    handle_inbound_stream(
+                        self.peer_id,
+                        self.server.clone(),
+                        self.inbound_events_tx.clone(),
+                        stream,
+                    )
+                    .boxed(),
+                );
             }
             ConnectionEvent::FullyNegotiatedOutbound(FullyNegotiatedOutbound {
                 protocol: mut stream,
@@ -327,7 +348,12 @@ async fn run_outbound_stream(client: Client, mut stream: Stream) -> OutboundExit
     }
 }
 
-async fn handle_inbound_stream(peer_id: PeerId, server: Server, mut stream: Stream) -> Result<()> {
+async fn handle_inbound_stream(
+    peer_id: PeerId,
+    server: Server,
+    inbound_events_tx: mpsc::UnboundedSender<OutEvent>,
+    mut stream: Stream,
+) -> Result<()> {
     if !server.is_started() {
         return Err(Error::ServerNotStarted);
     }
@@ -349,6 +375,10 @@ async fn handle_inbound_stream(peer_id: PeerId, server: Server, mut stream: Stre
             &public_key,
             &message,
         ) {
+            send_inbound_event(&inbound_events_tx, OutEvent::SyncRejected {
+                peer_id,
+                error: error.clone(),
+            });
             server
                 .set_err(Error::message(format!(
                     "invalid sync message: peer={peer_id} err={error}"
@@ -367,16 +397,28 @@ async fn handle_inbound_stream(peer_id: PeerId, server: Server, mut stream: Stre
             }
         }
 
-        server.update_step(peer_id, message.step).await?;
+        if server.update_step(peer_id, message.step).await? {
+            send_inbound_event(&inbound_events_tx, OutEvent::PeerStepUpdated {
+                peer_id,
+                step: message.step,
+            });
+        }
 
         pluto_p2p::proto::write_fixed_size_protobuf(&mut stream, &response)
             .await
             .map_err(Error::io)?;
 
         if message.shutdown {
+            send_inbound_event(&inbound_events_tx, OutEvent::PeerShutdownObserved { peer_id });
             server.set_shutdown(peer_id).await;
             server.clear_connected(peer_id).await;
             return Ok(());
         }
+    }
+}
+
+fn send_inbound_event(inbound_events_tx: &mpsc::UnboundedSender<OutEvent>, event: OutEvent) {
+    if let Err(error) = inbound_events_tx.send(event) {
+        tracing::error!(err = %error, "Failed to deliver inbound sync event");
     }
 }
