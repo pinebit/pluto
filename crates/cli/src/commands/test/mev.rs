@@ -328,10 +328,7 @@ async fn mev_create_block_test(
         .unwrap_or(latest_block_ts);
 
     if let Ok(remaining) = next_block_ts.duration_since(std::time::SystemTime::now()) {
-        tokio::select! {
-            _ = token.cancelled() => return test_res.fail(CliError::Other("timeout/interrupted".to_string())),
-            _ = tokio::time::sleep(remaining) => {}
-        }
+        tokio::time::sleep(remaining).await;
     }
 
     let latest_slot: i64 = match latest_block.slot.parse() {
@@ -362,10 +359,6 @@ async fn mev_create_block_test(
     let mut latest_block = latest_block;
 
     loop {
-        if token.is_cancelled() {
-            break;
-        }
-
         let start_iteration = Instant::now();
 
         let rtt = match create_mev_block(
@@ -397,10 +390,7 @@ async fn mev_create_block_test(
             .checked_sub(Duration::from_nanos(remainder_nanos))
             .unwrap_or_default();
         if let Some(sleep_dur) = slot_remainder.checked_sub(Duration::from_secs(1)) {
-            tokio::select! {
-                _ = token.cancelled() => break,
-                _ = tokio::time::sleep(sleep_dur) => {}
-            }
+            tokio::time::sleep(sleep_dur).await;
         }
 
         let start_beacon_fetch = Instant::now();
@@ -418,10 +408,7 @@ async fn mev_create_block_test(
 
         // Wait 1 second minus how long the fetch took.
         if let Some(sleep_dur) = Duration::from_secs(1).checked_sub(start_beacon_fetch.elapsed()) {
-            tokio::select! {
-                _ = token.cancelled() => break,
-                _ = tokio::time::sleep(sleep_dur) => {}
-            }
+            tokio::time::sleep(sleep_dur).await;
         }
     }
 
