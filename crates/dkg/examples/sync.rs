@@ -42,8 +42,8 @@
 //! 4. Each node starts one sync client per remote peer.
 //! 5. Once all clients are connected, the demo advances through steps 1 and 2.
 //! 6. The demo keeps the sync clients running in steady state.
-//! 7. Press `Ctrl+C` to trigger graceful shutdown and wait for all remote
-//!    shutdowns.
+//! 7. Press `Ctrl+C` on any node to stop that node immediately and let the
+//!    other nodes observe the fault.
 //!
 //! Success signals:
 //! - `Relay reservation accepted`
@@ -52,7 +52,7 @@
 //! - `Sync step reached`
 //! - `Sync demo is now idling until Ctrl+C`
 //! - `Sync steady-state heartbeat`
-//! - `All peers reported shutdown`
+//! - `Ctrl+C received, exiting without graceful shutdown`
 //!
 //! Transient relay warnings can occur during startup and reconnects. The demo
 //! is healthy once all cluster peers are connected and the sync steps complete.
@@ -305,27 +305,6 @@ fn log_connection_established(
     );
 }
 
-fn log_connection_closed(
-    peer_id: PeerId,
-    endpoint: &libp2p::core::ConnectedPoint,
-    num_established: u32,
-    cause: Option<&libp2p::swarm::ConnectionError>,
-    relay_peer_ids: &HashSet<PeerId>,
-    cluster_info: &ClusterInfo,
-) {
-    let (peer_label, peer_type, address) =
-        connection_log_fields(peer_id, endpoint, relay_peer_ids, cluster_info);
-    debug!(
-        peer_id = %peer_id,
-        peer_label = %peer_label,
-        peer_type,
-        address = %address,
-        num_established,
-        cause = ?cause,
-        "Connection closed"
-    );
-}
-
 fn log_identify_event(
     peer_id: PeerId,
     info: identify::Info,
@@ -470,6 +449,13 @@ async fn run_sync(
                 Err(sync::Error::Canceled) => break,
                 Err(error) => return Err(anyhow::anyhow!(error.to_string())),
             }
+
+            if step < 2 {
+                tokio::select! {
+                    _ = cancellation.cancelled() => break,
+                    _ = tokio::time::sleep(Duration::from_secs(3)) => {}
+                }
+            }
         }
     }
 
@@ -496,26 +482,16 @@ async fn run_sync(
         }
     }
 
-    let shutdown_cancellation = CancellationToken::new();
-    info!(
-        local_node = cluster_info.local_node_number,
-        "Starting graceful shutdown"
-    );
-    for client in &clients {
-        client.shutdown(shutdown_cancellation.child_token()).await?;
+    if cancellation.is_cancelled() {
+        info!(
+            local_node = cluster_info.local_node_number,
+            "Cancellation received, exiting without graceful shutdown"
+        );
     }
-
-    server
-        .await_all_shutdown(shutdown_cancellation.child_token())
-        .await?;
-    info!(
-        local_node = cluster_info.local_node_number,
-        "All peers reported shutdown"
-    );
 
     for join in client_joins {
         match join.await {
-            Ok(Ok(())) => {}
+            Ok(Ok(())) | Ok(Err(sync::Error::Canceled)) => {}
             Ok(Err(error)) => return Err(anyhow::anyhow!(error.to_string())),
             Err(error) => return Err(anyhow::anyhow!(error.to_string())),
         }
@@ -680,20 +656,23 @@ async fn main() -> Result<()> {
                     }
                     SwarmEvent::ConnectionClosed {
                         peer_id,
-                        endpoint,
-                        num_established,
                         cause,
                         ..
                     } => {
-                        log_connection_closed(
-                            peer_id,
-                            &endpoint,
-                            num_established,
-                            cause.as_ref(),
-                            &relay_peer_ids,
-                            &cluster_info,
-                        );
-                        connected_cluster_peers.remove(&peer_id);
+                        if cluster_info.indices.contains_key(&peer_id)
+                            && connected_cluster_peers.remove(&peer_id)
+                        {
+                            error!(
+                                local_node = cluster_info.local_node_number,
+                                peer_id = %peer_id,
+                                peer_label = %cluster_info.peer_label(&peer_id),
+                                connected = connected_cluster_peers.len(),
+                                expected = cluster_info.expected_connections(),
+                                missing_peers = ?cluster_info.missing_peers(&connected_cluster_peers),
+                                cause = ?cause,
+                                "Cluster peer disconnected"
+                            );
+                        }
                     }
                     SwarmEvent::OutgoingConnectionError {
                         peer_id,
