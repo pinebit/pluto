@@ -7,7 +7,7 @@ use std::{
 };
 
 use reqwest::{Method, StatusCode};
-use tokio::{sync::mpsc, task::JoinSet};
+use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
 use tracing::info;
 
@@ -191,30 +191,23 @@ async fn test_all_mevs(
     conf: &TestMevArgs,
     token: CancellationToken,
 ) -> HashMap<String, Vec<TestResult>> {
-    let (tx, mut rx) = mpsc::channel::<(String, Vec<TestResult>)>(conf.endpoints.len());
+    let mut join_set = JoinSet::new();
 
     for endpoint in &conf.endpoints {
         let queued_tests = queued_tests.to_vec();
         let conf = conf.clone();
         let endpoint = endpoint.clone();
         let token = token.clone();
-        let tx = tx.clone();
 
-        tokio::spawn(async move {
+        join_set.spawn(async move {
             let results = test_single_mev(&queued_tests, &conf, &endpoint, token).await;
             let relay_name = format_mev_relay_name(&endpoint);
-            let _ = tx.send((relay_name, results)).await;
+            (relay_name, results)
         });
     }
 
-    drop(tx);
-
-    let mut all_results = HashMap::new();
-    while let Some((name, results)) = rx.recv().await {
-        all_results.insert(name, results);
-    }
-
-    all_results
+    let all_results = join_set.join_all().await;
+    all_results.into_iter().collect::<HashMap<_, _>>()
 }
 
 async fn test_single_mev(
