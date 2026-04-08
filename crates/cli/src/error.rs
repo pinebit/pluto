@@ -76,6 +76,10 @@ pub enum CliError {
     #[error("Command parsing error: {0}")]
     CommandParsingError(#[from] clap::Error),
 
+    /// Create DKG error.
+    #[error("Create DKG error: {0}")]
+    CreateDKGError(#[from] crate::commands::create_dkg::CreateDkgError),
+
     /// Generic error with message.
     #[error("{0}")]
     Other(String),
