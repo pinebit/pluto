@@ -57,8 +57,6 @@ use crate::{
 pub const MIN_NODES: u64 = 3;
 /// Minimum threshold value.
 pub const MIN_THRESHOLD: u64 = 2;
-/// Zero ethereum address (not allowed on mainnet/gnosis).
-pub const ZERO_ADDRESS: &str = "0x0000000000000000000000000000000000000000";
 /// HTTP scheme.
 const HTTP_SCHEME: &str = "http";
 /// HTTPS scheme.
