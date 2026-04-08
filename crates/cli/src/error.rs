@@ -132,13 +132,9 @@ pub enum CreateClusterError {
     #[error("Invalid network configuration: {0}")]
     InvalidNetworkConfig(InvalidNetworkConfigError),
 
-    /// Absolute path error.
-    #[error("Absolute path retrieval error: {0}")]
-    AbsolutePathError(std::io::Error),
-
     /// IO error.
     #[error("IO error: {0}")]
-    IoError(std::io::Error),
+    IoError(#[from] std::io::Error),
 
     /// Node directory already exists.
     #[error(
@@ -266,10 +262,6 @@ pub enum CreateClusterError {
     /// Withdrawal validation error.
     #[error("Withdrawal validation error: {0}")]
     WithdrawalValidationError(#[from] crate::commands::create_dkg::WithdrawalValidationError),
-
-    /// Failed to read definition file.
-    #[error("Failed to read definition file: {0}")]
-    ReadDefinitionFile(#[from] std::io::Error),
 
     /// Failed to parse definition JSON.
     #[error("Failed to parse definition JSON: {0}")]

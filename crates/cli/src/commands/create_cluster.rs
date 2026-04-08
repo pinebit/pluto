@@ -580,7 +580,7 @@ pub async fn run(w: &mut dyn Write, mut args: CreateClusterArgs) -> CliResult<()
     }
 
     if args.split_keys {
-        write_split_keys_warning(w).map_err(CreateClusterError::IoError)?;
+        write_split_keys_warning(w)?;
     }
 
     write_output(
@@ -590,8 +590,7 @@ pub async fn run(w: &mut dyn Write, mut args: CreateClusterArgs) -> CliResult<()
         num_nodes,
         keys_to_disk,
         args.zipped,
-    )
-    .map_err(CreateClusterError::IoError)?;
+    )?;
 
     if !dashboard_url.is_empty() {
         info!(
@@ -711,9 +710,8 @@ async fn write_keys_to_disk(
             secrets.push(shares[i_usize]);
         }
 
-        let keys_dir = helpers::create_validator_keys_dir(node_dir(cluster_dir.as_ref(), i))
-            .await
-            .map_err(CreateClusterError::IoError)?;
+        let keys_dir =
+            helpers::create_validator_keys_dir(node_dir(cluster_dir.as_ref(), i)).await?;
 
         if insecure_keys {
             keystore::store_keys_insecure(&secrets, &keys_dir, &CONFIRM_INSECURE_KEYS).await?;
@@ -1119,12 +1117,9 @@ fn validate_create_config(args: &CreateClusterArgs) -> Result<()> {
 
 fn detect_node_dirs(cluster_dir: impl AsRef<Path>, node_amount: u64) -> Result<()> {
     for i in 0..node_amount {
-        let abs_path = std::path::absolute(node_dir(cluster_dir.as_ref(), i))
-            .map_err(CreateClusterError::AbsolutePathError)?;
+        let abs_path = std::path::absolute(node_dir(cluster_dir.as_ref(), i))?;
 
-        if std::fs::exists(abs_path.join("cluster-lock.json"))
-            .map_err(CreateClusterError::IoError)?
-        {
+        if std::fs::exists(abs_path.join("cluster-lock.json"))? {
             return Err(CreateClusterError::NodeDirectoryAlreadyExists { node_dir: abs_path });
         }
     }
@@ -1373,14 +1368,10 @@ async fn write_lock(lock: &Lock, cluster_dir: impl AsRef<Path>, num_nodes: u64) 
     for i in 0..num_nodes {
         let lock_path = node_dir(cluster_dir.as_ref(), i).join("cluster-lock.json");
 
-        tokio::fs::write(&lock_path, &bytes)
-            .await
-            .map_err(CreateClusterError::IoError)?;
+        tokio::fs::write(&lock_path, &bytes).await?;
 
         let perms = std::fs::Permissions::from_mode(0o400);
-        tokio::fs::set_permissions(&lock_path, perms)
-            .await
-            .map_err(CreateClusterError::IoError)?;
+        tokio::fs::set_permissions(&lock_path, perms).await?;
     }
 
     Ok(())
