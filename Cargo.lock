@@ -5447,7 +5447,9 @@ name = "pluto-cli"
 version = "1.7.1"
 dependencies = [
  "backon",
+ "chrono",
  "clap",
+ "flate2",
  "hex",
  "humantime",
  "k256",
@@ -5456,6 +5458,8 @@ dependencies = [
  "pluto-cluster",
  "pluto-core",
  "pluto-eth1wrap",
+ "pluto-crypto",
+ "pluto-eth2api",
  "pluto-eth2util",
  "pluto-k1util",
  "pluto-p2p",
@@ -5467,6 +5471,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
+ "tar",
  "tempfile",
  "test-case",
  "thiserror 2.0.18",
@@ -5474,6 +5479,8 @@ dependencies = [
  "tokio-util",
  "tracing",
  "wiremock",
+ "url",
+ "uuid",
 ]
 
 [[package]]
