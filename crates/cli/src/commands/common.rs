@@ -43,6 +43,11 @@ pub fn build_console_tracing_config(
         ConsoleColor::Disable => builder.console_with_ansi(false),
     };
 
+    // TODO: Handle loki config
+
+    // TODO: Handle log output path
+
+
     builder.override_env_filter(level.into()).build()
 }
 
