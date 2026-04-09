@@ -5455,7 +5455,6 @@ dependencies = [
  "backon",
  "chrono",
  "clap",
- "flate2",
  "hex",
  "humantime",
  "k256",
@@ -5477,7 +5476,6 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
- "tar",
  "tempfile",
  "test-case",
  "thiserror 2.0.18",
@@ -5485,7 +5483,6 @@ dependencies = [
  "tokio-util",
  "tracing",
  "url",
- "uuid",
  "wiremock",
 ]
 

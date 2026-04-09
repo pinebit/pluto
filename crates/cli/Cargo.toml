@@ -40,9 +40,6 @@ tempfile.workspace = true
 reqwest.workspace = true
 url.workspace = true
 chrono.workspace = true
-uuid.workspace = true
-flate2.workspace = true
-tar.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
