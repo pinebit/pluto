@@ -47,7 +47,6 @@ pub fn build_console_tracing_config(
 
     // TODO: Handle log output path
 
-
     builder.override_env_filter(level.into()).build()
 }
 

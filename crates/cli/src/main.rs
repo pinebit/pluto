@@ -52,7 +52,11 @@ async fn dispatch(cli: Cli, ct: CancellationToken) -> std::result::Result<(), Cl
         },
         Commands::Enr(args) => commands::enr::run(args),
         Commands::Version(args) => commands::version::run(args),
-        Commands::Dkg(args) => commands::dkg::run(*args, ct.clone()).await,
+        Commands::Dkg(args) => {
+            let config = (*args).into_config()?;
+            pluto_tracing::init(&config.log).expect("Failed to initialize tracing");
+            commands::dkg::run(config, ct.clone()).await
+        }
         Commands::Relay(args) => {
             let config: pluto_relay_server::config::Config = (*args).clone().try_into()?;
             pluto_tracing::init(&config.log_config).expect("Failed to initialize tracing");

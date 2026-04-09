@@ -121,6 +121,9 @@ pub struct DkgArgs {
 impl DkgArgs {
     /// Converts CLI arguments into the DKG crate configuration.
     pub fn into_config(self) -> Result<pluto_dkg::dkg::Config> {
+        validate_p2p_args(&self.p2p)?;
+        warn_for_insecure_relays(&self.p2p.relays);
+
         let tracing_config = build_console_tracing_config(self.log.level.clone(), &self.log.color);
         let p2p_config = {
             let mut relays = Vec::new();
@@ -253,46 +256,21 @@ pub struct DkgLogArgs {
     pub log_output_path: Option<PathBuf>,
 }
 
-/// Runs the `dkg` command.
-pub async fn run(args: DkgArgs, ct: CancellationToken) -> Result<()> {
-    run_with_runner_and_init(
-        args,
-        ct,
-        |config| {
-            let _ = pluto_tracing::init(config)?;
-            Ok::<(), CliError>(())
-        },
-        pluto_dkg::dkg::run,
-    )
-    .await
+/// Runs the `dkg` command from an already-built configuration.
+pub async fn run(config: pluto_dkg::dkg::Config, ct: CancellationToken) -> Result<()> {
+    run_with_runner(config, ct, pluto_dkg::dkg::run).await
 }
 
-async fn run_with_runner_and_init<Init, Runner, InitError, Fut>(
-    args: DkgArgs,
+async fn run_with_runner<Runner, Fut>(
+    config: pluto_dkg::dkg::Config,
     ct: CancellationToken,
-    init_tracing: Init,
     runner: Runner,
 ) -> Result<()>
 where
-    Init: FnOnce(&pluto_tracing::TracingConfig) -> std::result::Result<(), InitError>,
-    CliError: From<InitError>,
     Runner: FnOnce(pluto_dkg::dkg::Config, CancellationToken) -> Fut,
     Fut: Future<Output = std::result::Result<(), pluto_dkg::dkg::DkgError>>,
 {
-    validate_p2p_args(&args.p2p)?;
-    warn_for_insecure_relays(&args.p2p.relays);
-
-    let config = args.into_config()?;
-    init_tracing(&config.log)?;
-
     info!(LICENSE);
-    info!(
-        data_dir = %config.data_dir.display(),
-        definition_file = %config.def_file,
-        publish = config.publish.enabled,
-        zipped = config.zipped,
-        "Starting DKG entrypoint"
-    );
 
     runner(config, ct).await.map_err(Into::into)
 }
@@ -327,14 +305,7 @@ mod tests {
     use crate::cli::{Cli, Commands};
     use clap::Parser;
     use libp2p::{Multiaddr, multiaddr};
-    use std::{
-        str::FromStr,
-        sync::{
-            Arc,
-            atomic::{AtomicBool, Ordering},
-        },
-        time::Duration as StdDuration,
-    };
+    use std::{str::FromStr, sync::Arc, time::Duration as StdDuration};
 
     #[test]
     fn dkg_is_registered_as_top_level_subcommand() {
@@ -488,7 +459,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn run_initializes_tracing_before_runner_and_passes_token() {
+    async fn run_passes_config_and_token_to_runner() {
         let cli = Cli::try_parse_from([
             "pluto",
             "dkg",
@@ -501,44 +472,26 @@ mod tests {
         let Commands::Dkg(args) = cli.command else {
             panic!("expected dkg command");
         };
-        let args = *args;
+        let config = (*args).into_config().expect("config should map");
 
         let events = Arc::new(std::sync::Mutex::new(Vec::new()));
-        let init_called = Arc::new(AtomicBool::new(false));
         let ct = CancellationToken::new();
 
-        run_with_runner_and_init(
-            args,
-            ct.clone(),
-            {
-                let events = events.clone();
-                let init_called = init_called.clone();
-                move |config| {
-                    init_called.store(true, Ordering::SeqCst);
-                    assert_eq!(config.override_env_filter.as_deref(), Some("debug"));
-                    let console = config.console.as_ref().expect("console config");
-                    assert!(!console.with_ansi);
-                    events.lock().expect("lock").push("init");
-                    Ok::<(), CliError>(())
-                }
-            },
-            {
-                let events = events.clone();
-                move |config, token| {
-                    let init_called = init_called.clone();
-                    async move {
-                        assert!(init_called.load(Ordering::SeqCst));
-                        assert!(!token.is_cancelled());
-                        assert_eq!(config.def_file, ".charon/cluster-definition.json");
-                        events.lock().expect("lock").push("runner");
-                        Ok(())
-                    }
-                }
-            },
-        )
+        run_with_runner(config, ct.clone(), {
+            let events = events.clone();
+            move |config, token| async move {
+                assert!(!token.is_cancelled());
+                assert_eq!(config.def_file, ".charon/cluster-definition.json");
+                assert_eq!(config.log.override_env_filter.as_deref(), Some("debug"));
+                let console = config.log.console.as_ref().expect("console config");
+                assert!(!console.with_ansi);
+                events.lock().expect("lock").push("runner");
+                Ok(())
+            }
+        })
         .await
         .expect("dkg run should succeed");
 
-        assert_eq!(*events.lock().expect("lock"), vec!["init", "runner"]);
+        assert_eq!(*events.lock().expect("lock"), vec!["runner"]);
     }
 }
