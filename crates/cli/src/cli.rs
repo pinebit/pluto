@@ -4,6 +4,7 @@ use clap::{Parser, Subcommand};
 
 use crate::commands::{
     create_enr::CreateEnrArgs,
+    dkg::DkgArgs,
     enr::EnrArgs,
     relay::RelayArgs,
     test::{
@@ -50,6 +51,12 @@ pub enum Commands {
         long_about = "Starts a libp2p circuit relay that charon clients can use to discover and connect to their peers."
     )]
     Relay(Box<RelayArgs>),
+
+    #[command(
+        about = "Participate in a Distributed Key Generation ceremony",
+        long_about = "Participate in a distributed key generation ceremony for a specific cluster definition that creates distributed validator key shares and a final cluster lock configuration. Note that all other cluster operators should run this command at the same time."
+    )]
+    Dkg(Box<DkgArgs>),
 
     #[command(
         about = "Alpha subcommands provide early access to in-development features",

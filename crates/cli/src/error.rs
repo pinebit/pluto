@@ -72,6 +72,14 @@ pub enum CliError {
     #[error("Relay P2P error: {0}")]
     RelayP2PError(#[from] pluto_relay_server::error::RelayP2PError),
 
+    /// DKG command error.
+    #[error("DKG error: {0}")]
+    DkgError(#[from] pluto_dkg::dkg::DkgError),
+
+    /// Tracing initialization error.
+    #[error("Tracing initialization error: {0}")]
+    TracingInit(#[from] pluto_tracing::init::Error),
+
     /// Command parsing error.
     #[error("Command parsing error: {0}")]
     CommandParsingError(#[from] clap::Error),

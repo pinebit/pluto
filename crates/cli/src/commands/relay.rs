@@ -1,18 +1,14 @@
-use crate::error::CliError;
-use libp2p::{
-    Multiaddr,
-    multiaddr::{self, Protocol},
+use crate::{
+    commands::common::{
+        ConsoleColor, DEFAULT_RELAYS, LICENSE, build_console_tracing_config, parse_relay_addr,
+    },
+    error::CliError,
 };
+use libp2p::multiaddr::Protocol;
 use pluto_p2p::k1;
-use std::{path::PathBuf, str::FromStr};
+use std::path::PathBuf;
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
-
-pub const LICENSE: &str = concat!(
-    "This software is licensed under the Maria DB Business Source License 1.1; ",
-    "you may not use this software except in compliance with this license. You may obtain a ",
-    "copy of this license at https://github.com/ObolNetwork/charon/blob/main/LICENSE"
-);
 
 /// Arguments for the relay command.
 #[derive(clap::Args, Clone)]
@@ -44,8 +40,7 @@ impl TryInto<pluto_relay_server::config::Config> for RelayArgs {
             let mut relays = Vec::new();
 
             for relay in &self.p2p.relays {
-                let multiaddr =
-                    multiaddr::from_url(relay).or_else(|_| Multiaddr::from_str(relay))?;
+                let multiaddr = parse_relay_addr(relay)?;
 
                 if multiaddr.iter().any(|protocol| protocol == Protocol::Http) {
                     tracing::warn!(
@@ -67,23 +62,7 @@ impl TryInto<pluto_relay_server::config::Config> for RelayArgs {
             }
         };
 
-        let log_config = {
-            let mut builder = pluto_tracing::TracingConfig::builder();
-
-            builder = builder.with_default_console();
-            builder = match self.log.color {
-                ConsoleColor::Auto => builder.console_with_ansi(std::env::var("NO_COLOR").is_err()),
-                ConsoleColor::Force => builder.console_with_ansi(true),
-                ConsoleColor::Disable => builder.console_with_ansi(false),
-            };
-            builder = builder.override_env_filter(self.log.level);
-
-            // TODO: Handle loki config
-
-            // TODO: Handle log output path
-
-            builder.build()
-        };
+        let log_config = build_console_tracing_config(self.log.level.clone(), &self.log.color);
 
         let builder = pluto_relay_server::config::Config::builder()
             .data_dir(self.data_dir.data_dir)
@@ -186,12 +165,6 @@ pub struct RelayDebugMonitoringArgs {
     pub debug_addr: Option<String>,
 }
 
-const DEFAULT_RELAYS: [&str; 3] = [
-    "https://0.relay.obol.tech",
-    "https://2.relay.obol.dev",
-    "https://1.relay.obol.tech",
-];
-
 #[derive(clap::Args, Clone)]
 pub struct RelayP2PArgs {
     #[arg(
@@ -269,14 +242,6 @@ pub struct RelayLogFlags {
         help = "Path in which to write on-disk logs."
     )]
     pub log_output_path: Option<PathBuf>,
-}
-
-#[derive(clap::ValueEnum, Clone, Default)]
-pub enum ConsoleColor {
-    #[default]
-    Auto,
-    Force,
-    Disable,
 }
 
 #[derive(clap::Args, Clone)]

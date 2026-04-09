@@ -51,10 +51,6 @@ pub enum DkgError {
     /// Disk or definition preflight failed.
     #[error("DKG preflight failed: {0}")]
     Disk(#[from] crate::disk::DiskError),
-
-    /// Private-key locking setup failed.
-    #[error("private-key lock setup failed: {0}")]
-    PrivKeyLock(#[from] pluto_app::privkeylock::PrivKeyLockError),
 }
 
 /// Keymanager configuration accepted by the entrypoint.

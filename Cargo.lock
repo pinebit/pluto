@@ -5451,6 +5451,7 @@ dependencies = [
  "pluto-app",
  "pluto-cluster",
  "pluto-core",
+ "pluto-dkg",
  "pluto-eth2util",
  "pluto-k1util",
  "pluto-p2p",
@@ -5468,6 +5469,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+ "url",
  "wiremock",
 ]
 
@@ -5561,12 +5563,14 @@ name = "pluto-dkg"
 version = "1.7.1"
 dependencies = [
  "anyhow",
+ "bon",
  "clap",
  "either",
  "futures",
  "hex",
  "k256",
  "libp2p",
+ "pluto-app",
  "pluto-build-proto",
  "pluto-cluster",
  "pluto-core",
@@ -5598,6 +5602,7 @@ version = "1.7.1"
 dependencies = [
  "alloy",
  "thiserror 2.0.18",
+ "tokio",
  "url",
 ]
 

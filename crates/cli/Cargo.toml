@@ -19,6 +19,7 @@ humantime.workspace = true
 tokio.workspace = true
 pluto-app.workspace = true
 pluto-cluster.workspace = true
+pluto-dkg.workspace = true
 pluto-relay-server.workspace = true
 pluto-tracing.workspace = true
 pluto-core.workspace = true
@@ -35,6 +36,7 @@ serde_with = { workspace = true, features = ["base64"] }
 rand.workspace = true
 tempfile.workspace = true
 reqwest.workspace = true
+url.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
