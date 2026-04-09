@@ -484,7 +484,7 @@ async fn main() -> Result<()> {
                         }
                     }
                     SwarmEvent::Behaviour(PlutoBehaviourEvent::Inner(
-                        CombinedBehaviourEvent::ParSigEx(Event::BroadcastFinished {
+                        CombinedBehaviourEvent::ParSigEx(Event::BroadcastFailed {
                             request_id,
                         }),
                     )) => {

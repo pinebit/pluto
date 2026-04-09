@@ -6,8 +6,7 @@ use std::{
     time::Duration,
 };
 
-use futures::{future::BoxFuture, prelude::*};
-use futures_timer::Delay;
+use futures::{FutureExt, StreamExt, future::BoxFuture, stream::FuturesUnordered};
 use libp2p::{
     PeerId,
     core::upgrade::ReadyUpgrade,
@@ -19,40 +18,12 @@ use libp2p::{
         },
     },
 };
+use tokio::time::timeout;
 
 use pluto_core::types::{Duty, ParSignedDataSet};
 
 use super::{DutyGater, PROTOCOL_NAME, Verifier, protocol};
-use crate::Error as CodecError;
-
-/// Failure type for the partial signature exchange handler.
-#[derive(Debug, thiserror::Error)]
-pub enum Failure {
-    /// Stream negotiation timed out.
-    #[error("parsigex protocol negotiation timed out")]
-    Timeout,
-    /// Invalid payload.
-    #[error("invalid parsigex payload")]
-    InvalidPayload,
-    /// Duty not accepted by the gater.
-    #[error("invalid duty")]
-    InvalidDuty,
-    /// Signature verification failed.
-    #[error("invalid partial signature")]
-    InvalidPartialSignature,
-    /// I/O error.
-    #[error("{0}")]
-    Io(String),
-    /// Codec error.
-    #[error("codec error: {0}")]
-    Codec(CodecError),
-}
-
-impl Failure {
-    fn io(error: impl std::fmt::Display) -> Self {
-        Self::Io(error.to_string())
-    }
-}
+use crate::error::Failure;
 
 /// Command sent from the behaviour to a handler.
 #[derive(Debug)]
@@ -92,99 +63,22 @@ pub enum FromHandler {
     },
 }
 
-type SendFuture = BoxFuture<'static, Result<(), Failure>>;
-type RecvFuture = BoxFuture<'static, Result<(Duty, ParSignedDataSet), Failure>>;
-
-enum OutboundState {
-    IdleStream { stream: libp2p::swarm::Stream },
-    RequestOpenStream { request_id: u64, payload: Vec<u8> },
-    Sending { request_id: u64, future: SendFuture },
-}
-
-impl std::fmt::Debug for OutboundState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            OutboundState::IdleStream { .. } => {
-                write!(f, "IdleStream {{ stream: <libp2p::swarm::Stream> }}")
-            }
-            OutboundState::RequestOpenStream {
-                request_id,
-                payload,
-            } => write!(
-                f,
-                "RequestOpenStream {{ request_id: {}, payload: {:?} }}",
-                request_id, payload
-            ),
-            OutboundState::Sending { request_id, .. } => write!(
-                f,
-                "Sending {{ request_id: {}, future: <dynamic> }}",
-                request_id
-            ),
-        }
-    }
-}
-
-fn recv_message(
-    mut stream: libp2p::swarm::Stream,
-    verifier: Verifier,
-    duty_gater: DutyGater,
-    timeout: Duration,
-) -> RecvFuture {
-    async move {
-        let recv = async {
-            let bytes = protocol::recv_message(&mut stream)
-                .await
-                .map_err(Failure::io)?;
-            let (duty, data_set) =
-                protocol::decode_message(&bytes).map_err(|_| Failure::InvalidPayload)?;
-            if !(duty_gater)(&duty) {
-                return Err(Failure::InvalidDuty);
-            }
-
-            for (pub_key, par_sig) in data_set.inner() {
-                verifier(duty.clone(), *pub_key, par_sig.clone())
-                    .await
-                    .map_err(|_| Failure::InvalidPartialSignature)?;
-            }
-
-            Ok((duty, data_set))
-        };
-
-        futures::pin_mut!(recv);
-        match futures::future::select(recv, Delay::new(timeout)).await {
-            futures::future::Either::Left((result, _)) => result,
-            futures::future::Either::Right(((), _)) => Err(Failure::Timeout),
-        }
-    }
-    .boxed()
-}
-
-fn send_message(
-    mut stream: libp2p::swarm::Stream,
+/// Outbound open info that carries the request context through stream
+/// negotiation.
+pub struct PendingOpen {
+    request_id: u64,
     payload: Vec<u8>,
-    timeout: Duration,
-) -> SendFuture {
-    async move {
-        let send =
-            protocol::send_message(&mut stream, &payload).map(|result| result.map_err(Failure::io));
-        futures::pin_mut!(send);
-        match futures::future::select(send, Delay::new(timeout)).await {
-            futures::future::Either::Left((result, _)) => result,
-            futures::future::Either::Right(((), _)) => Err(Failure::Timeout),
-        }
-    }
-    .boxed()
 }
+
+type ActiveFuture = BoxFuture<'static, Option<FromHandler>>;
 
 /// Connection handler for parsigex.
 pub struct Handler {
     timeout: Duration,
     verifier: Verifier,
     duty_gater: DutyGater,
-    outbound_queue: VecDeque<(u64, Vec<u8>)>,
-    outbound: Option<OutboundState>,
-    inbound: Option<RecvFuture>,
-    pending_events: VecDeque<FromHandler>,
+    pending_open: VecDeque<PendingOpen>,
+    active_futures: FuturesUnordered<ActiveFuture>,
 }
 
 impl Handler {
@@ -199,32 +93,81 @@ impl Handler {
             timeout,
             verifier,
             duty_gater,
-            outbound_queue: VecDeque::new(),
-            outbound: None,
-            inbound: None,
-            pending_events: VecDeque::new(),
+            pending_open: VecDeque::new(),
+            active_futures: FuturesUnordered::new(),
         }
     }
 
-    fn on_dial_upgrade_error(
-        &mut self,
-        error: DialUpgradeError<(), <Self as ConnectionHandler>::OutboundProtocol>,
-    ) {
-        let Some(OutboundState::RequestOpenStream { request_id, .. }) = self.outbound.take() else {
-            return;
-        };
+    fn handle_fully_negotiated_inbound(&mut self, mut stream: libp2p::swarm::Stream) {
+        stream.ignore_for_keep_alive();
+        let verifier = self.verifier.clone();
+        let duty_gater = self.duty_gater.clone();
+        let t = self.timeout;
 
-        let failure = match error.error {
+        self.active_futures.push(
+            async move {
+                Some(
+                    match timeout(t, do_recv(stream, verifier, duty_gater)).await {
+                        Ok(Ok((duty, data_set))) => FromHandler::Received { duty, data_set },
+                        Ok(Err(e)) => FromHandler::InboundError(e),
+                        Err(_) => FromHandler::InboundError(Failure::Timeout),
+                    },
+                )
+            }
+            .boxed(),
+        );
+    }
+
+    fn handle_fully_negotiated_outbound(
+        &mut self,
+        mut stream: libp2p::swarm::Stream,
+        info: PendingOpen,
+    ) {
+        stream.ignore_for_keep_alive();
+        let PendingOpen {
+            request_id,
+            payload,
+        } = info;
+        let t = self.timeout;
+
+        self.active_futures.push(
+            async move {
+                Some(match timeout(t, do_send(stream, payload)).await {
+                    Ok(Ok(())) => FromHandler::OutboundSuccess { request_id },
+                    Ok(Err(e)) => FromHandler::OutboundError {
+                        request_id,
+                        error: e,
+                    },
+                    Err(_) => FromHandler::OutboundError {
+                        request_id,
+                        error: Failure::Timeout,
+                    },
+                })
+            }
+            .boxed(),
+        );
+    }
+
+    fn handle_dial_upgrade_error<E>(&mut self, info: PendingOpen, error: StreamUpgradeError<E>)
+    where
+        E: std::error::Error + Send + Sync + 'static,
+    {
+        let request_id = info.request_id;
+        let failure = match error {
             StreamUpgradeError::Timeout => Failure::Timeout,
             StreamUpgradeError::NegotiationFailed => Failure::io("protocol negotiation failed"),
-            StreamUpgradeError::Apply(e) => libp2p::core::util::unreachable(e),
+            StreamUpgradeError::Apply(e) => Failure::io(e),
             StreamUpgradeError::Io(e) => Failure::io(e),
         };
-
-        self.pending_events.push_back(FromHandler::OutboundError {
-            request_id,
-            error: failure,
-        });
+        self.active_futures.push(
+            async move {
+                Some(FromHandler::OutboundError {
+                    request_id,
+                    error: failure,
+                })
+            }
+            .boxed(),
+        );
     }
 }
 
@@ -232,7 +175,7 @@ impl ConnectionHandler for Handler {
     type FromBehaviour = ToHandler;
     type InboundOpenInfo = ();
     type InboundProtocol = ReadyUpgrade<StreamProtocol>;
-    type OutboundOpenInfo = ();
+    type OutboundOpenInfo = PendingOpen;
     type OutboundProtocol = ReadyUpgrade<StreamProtocol>;
     type ToBehaviour = FromHandler;
 
@@ -245,99 +188,31 @@ impl ConnectionHandler for Handler {
             ToHandler::Send {
                 request_id,
                 payload,
-            } => self.outbound_queue.push_back((request_id, payload)),
+            } => {
+                self.pending_open.push_back(PendingOpen {
+                    request_id,
+                    payload,
+                });
+            }
         }
     }
 
-    #[tracing::instrument(level = "trace", name = "ConnectionHandler::poll", skip(self, cx))]
     fn poll(
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<
         ConnectionHandlerEvent<Self::OutboundProtocol, Self::OutboundOpenInfo, Self::ToBehaviour>,
     > {
-        if let Some(event) = self.pending_events.pop_front() {
-            return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(event));
-        }
-
-        if let Some(fut) = self.inbound.as_mut() {
-            match fut.poll_unpin(cx) {
-                Poll::Pending => {}
-                Poll::Ready(Ok((duty, data_set))) => {
-                    self.inbound = None;
-                    return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(
-                        FromHandler::Received { duty, data_set },
-                    ));
-                }
-                Poll::Ready(Err(error)) => {
-                    self.inbound = None;
-                    return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(
-                        FromHandler::InboundError(error),
-                    ));
-                }
-            }
-        }
-
-        if let Some(outbound) = self.outbound.take() {
-            match outbound {
-                OutboundState::IdleStream { stream } => {
-                    if let Some((request_id, payload)) = self.outbound_queue.pop_front() {
-                        self.outbound = Some(OutboundState::Sending {
-                            request_id,
-                            future: send_message(stream, payload, self.timeout),
-                        });
-                    } else {
-                        self.outbound = Some(OutboundState::IdleStream { stream });
-                    }
-                }
-                OutboundState::RequestOpenStream {
-                    request_id,
-                    payload,
-                } => {
-                    // Waiting for stream negotiation - put state back and return pending.
-                    // The OutboundSubstreamRequest was already emitted when first entering this
-                    // state. Returning it again would cause libp2p to panic
-                    // with "cannot extract twice".
-                    self.outbound = Some(OutboundState::RequestOpenStream {
-                        request_id,
-                        payload,
-                    });
-                }
-                OutboundState::Sending {
-                    request_id,
-                    mut future,
-                } => match future.poll_unpin(cx) {
-                    Poll::Pending => {
-                        self.outbound = Some(OutboundState::Sending { request_id, future });
-                    }
-                    Poll::Ready(Ok(())) => {
-                        self.outbound = None;
-                        return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(
-                            FromHandler::OutboundSuccess { request_id },
-                        ));
-                    }
-                    Poll::Ready(Err(error)) => {
-                        self.outbound = None;
-                        return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(
-                            FromHandler::OutboundError { request_id, error },
-                        ));
-                    }
-                },
-            }
-        }
-
-        // Only start a new outbound operation if none is in progress.
-        // This prevents overwriting RequestOpenStream or Sending states.
-        if self.outbound.is_none()
-            && let Some((request_id, payload)) = self.outbound_queue.pop_front()
-        {
-            self.outbound = Some(OutboundState::RequestOpenStream {
-                request_id,
-                payload,
-            });
+        if let Some(pending) = self.pending_open.pop_front() {
             return Poll::Ready(ConnectionHandlerEvent::OutboundSubstreamRequest {
-                protocol: SubstreamProtocol::new(ReadyUpgrade::new(PROTOCOL_NAME), ()),
+                protocol: SubstreamProtocol::new(ReadyUpgrade::new(PROTOCOL_NAME), pending),
             });
+        }
+
+        while let Poll::Ready(Some(event)) = self.active_futures.poll_next_unpin(cx) {
+            if let Some(event) = event {
+                return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(event));
+            }
         }
 
         Poll::Pending
@@ -345,59 +220,53 @@ impl ConnectionHandler for Handler {
 
     fn on_connection_event(
         &mut self,
-        event: ConnectionEvent<Self::InboundProtocol, Self::OutboundProtocol>,
+        event: ConnectionEvent<
+            Self::InboundProtocol,
+            Self::OutboundProtocol,
+            Self::InboundOpenInfo,
+            Self::OutboundOpenInfo,
+        >,
     ) {
         match event {
             ConnectionEvent::FullyNegotiatedInbound(FullyNegotiatedInbound {
-                protocol: mut stream,
+                protocol: stream,
                 ..
-            }) => {
-                stream.ignore_for_keep_alive();
-                self.inbound = Some(recv_message(
-                    stream,
-                    self.verifier.clone(),
-                    self.duty_gater.clone(),
-                    self.timeout,
-                ));
-            }
+            }) => self.handle_fully_negotiated_inbound(stream),
             ConnectionEvent::FullyNegotiatedOutbound(FullyNegotiatedOutbound {
-                protocol: mut stream,
+                protocol: stream,
+                info,
                 ..
-            }) => {
-                stream.ignore_for_keep_alive();
-                match self.outbound.take() {
-                    Some(OutboundState::RequestOpenStream {
-                        request_id,
-                        payload,
-                    }) => {
-                        self.outbound = Some(OutboundState::Sending {
-                            request_id,
-                            future: send_message(stream, payload, self.timeout),
-                        });
-                    }
-                    Some(OutboundState::Sending { request_id, future }) => {
-                        self.outbound = Some(OutboundState::Sending { request_id, future });
-                        tracing::debug!(
-                            "dropping unexpected outbound parsigex stream while a send is already in progress"
-                        );
-                    }
-                    Some(OutboundState::IdleStream {
-                        stream: idle_stream,
-                    }) => {
-                        self.outbound = Some(OutboundState::IdleStream {
-                            stream: idle_stream,
-                        });
-                        tracing::debug!(
-                            "dropping unexpected outbound parsigex stream while an idle stream is already cached"
-                        );
-                    }
-                    None => {
-                        self.outbound = Some(OutboundState::IdleStream { stream });
-                    }
-                }
+            }) => self.handle_fully_negotiated_outbound(stream, info),
+            ConnectionEvent::DialUpgradeError(DialUpgradeError { info, error }) => {
+                self.handle_dial_upgrade_error(info, error);
             }
-            ConnectionEvent::DialUpgradeError(error) => self.on_dial_upgrade_error(error),
             _ => {}
         }
     }
+}
+
+async fn do_recv(
+    mut stream: libp2p::swarm::Stream,
+    verifier: Verifier,
+    duty_gater: DutyGater,
+) -> Result<(Duty, ParSignedDataSet), Failure> {
+    let bytes = protocol::recv_message(&mut stream)
+        .await
+        .map_err(Failure::io)?;
+    let (duty, data_set) = protocol::decode_message(&bytes).map_err(|_| Failure::InvalidPayload)?;
+    if !duty_gater(&duty) {
+        return Err(Failure::InvalidDuty);
+    }
+    for (pub_key, par_sig) in data_set.inner() {
+        verifier(duty.clone(), *pub_key, par_sig.clone())
+            .await
+            .map_err(|_| Failure::InvalidPartialSignature)?;
+    }
+    Ok((duty, data_set))
+}
+
+async fn do_send(mut stream: libp2p::swarm::Stream, payload: Vec<u8>) -> Result<(), Failure> {
+    protocol::send_message(&mut stream, &payload)
+        .await
+        .map_err(Failure::io)
 }

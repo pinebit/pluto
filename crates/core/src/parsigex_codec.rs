@@ -93,8 +93,9 @@ pub(crate) fn deserialize_signed_data(
     }
 
     match duty_type {
-        DutyType::Attester => deserialize_json!(VersionedAttestation)
-            .or_else(|_| deserialize_json!(Attestation))
+        // Match Go order: old Attestation format first, then VersionedAttestation.
+        DutyType::Attester => deserialize_json!(Attestation)
+            .or_else(|_| deserialize_json!(VersionedAttestation))
             .map_err(|_| ParSigExCodecError::UnsupportedDutyType),
         DutyType::Proposer => deserialize_json!(VersionedSignedProposal),
         DutyType::BuilderProposer => Err(ParSigExCodecError::DeprecatedBuilderProposer),
@@ -103,8 +104,9 @@ pub(crate) fn deserialize_signed_data(
         DutyType::Randao => deserialize_json!(SignedRandao),
         DutyType::Signature => deserialize_json!(Signature),
         DutyType::PrepareAggregator => deserialize_json!(BeaconCommitteeSelection),
-        DutyType::Aggregator => deserialize_json!(VersionedSignedAggregateAndProof)
-            .or_else(|_| deserialize_json!(SignedAggregateAndProof))
+        // Match Go order: old SignedAggregateAndProof format first, then versioned.
+        DutyType::Aggregator => deserialize_json!(SignedAggregateAndProof)
+            .or_else(|_| deserialize_json!(VersionedSignedAggregateAndProof))
             .map_err(|_| ParSigExCodecError::UnsupportedDutyType),
         DutyType::SyncMessage => deserialize_json!(SignedSyncMessage),
         DutyType::PrepareSyncContribution => deserialize_json!(SyncCommitteeSelection),

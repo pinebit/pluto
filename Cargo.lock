@@ -5743,7 +5743,6 @@ dependencies = [
  "clap",
  "either",
  "futures",
- "futures-timer",
  "hex",
  "libp2p",
  "pluto-cluster",

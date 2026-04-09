@@ -9,7 +9,6 @@ publish.workspace = true
 [dependencies]
 either.workspace = true
 futures.workspace = true
-futures-timer.workspace = true
 libp2p.workspace = true
 prost.workspace = true
 thiserror.workspace = true

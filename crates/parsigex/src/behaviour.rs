@@ -25,8 +25,11 @@ use tokio::sync::mpsc;
 use pluto_core::types::{Duty, ParSignedData, ParSignedDataSet, PubKey};
 use pluto_p2p::p2p_context::P2PContext;
 
-use super::{Error as CodecError, Handler, encode_message};
-use crate::handler::{Failure as HandlerFailure, FromHandler, ToHandler};
+use super::{Handler, encode_message};
+use crate::{
+    error::{Error, Failure, Result, VerifyError},
+    handler::{FromHandler, ToHandler},
+};
 
 /// Future returned by verifier callbacks.
 pub type VerifyFuture =
@@ -38,55 +41,6 @@ pub type Verifier =
 
 /// Duty gate callback type.
 pub type DutyGater = Arc<dyn Fn(&Duty) -> bool + Send + Sync + 'static>;
-
-/// Error type for signature verification callbacks.
-#[derive(Debug, thiserror::Error)]
-pub enum VerifyError {
-    /// Unknown validator public key.
-    #[error("unknown pubkey, not part of cluster lock")]
-    UnknownPubKey,
-
-    /// Invalid share index for the validator.
-    #[error("invalid shareIdx")]
-    InvalidShareIndex,
-
-    /// Invalid signed-data family for the duty.
-    #[error("invalid eth2 signed data")]
-    InvalidSignedDataFamily,
-
-    /// Generic verification error.
-    #[error("{0}")]
-    Other(String),
-}
-
-/// Error type for behaviour operations.
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    /// Message conversion failed.
-    #[error(transparent)]
-    Codec(#[from] CodecError),
-
-    /// Channel closed.
-    #[error("parsigex handle closed")]
-    Closed,
-
-    /// Broadcast failed for a peer.
-    #[error("broadcast to peer {peer} failed: {source}")]
-    BroadcastPeer {
-        /// Peer for which the broadcast failed.
-        peer: PeerId,
-        /// Source error.
-        #[source]
-        source: HandlerFailure,
-    },
-
-    /// Peer is not currently connected.
-    #[error("peer {0} is not connected")]
-    PeerNotConnected(PeerId),
-}
-
-/// Result type for partial signature exchange behaviour operations.
-pub type Result<T> = std::result::Result<T, Error>;
 
 /// Event emitted by the partial signature exchange behaviour.
 #[derive(Debug)]
@@ -109,24 +63,24 @@ pub enum Event {
         /// Connection on which the error occurred.
         connection: ConnectionId,
         /// Failure reason.
-        error: HandlerFailure,
+        error: Failure,
     },
     /// Broadcast failed.
     BroadcastError {
         /// Request identifier.
         request_id: u64,
-        /// Peer for which the broadcast failed.
+        /// Peer for which the broadcast failed, if known.
         peer: Option<PeerId>,
         /// Failure reason.
-        error: HandlerFailure,
+        error: Failure,
     },
     /// Broadcast completed successfully for all targeted peers.
     BroadcastComplete {
         /// Request identifier.
         request_id: u64,
     },
-    /// Broadcast finished after one or more peer failures.
-    BroadcastFinished {
+    /// Broadcast failed after one or more peer failures.
+    BroadcastFailed {
         /// Request identifier.
         request_id: u64,
     },
@@ -165,7 +119,6 @@ impl Handle {
                 data_set,
             })
             .map_err(|_| Error::Closed)?;
-
         Ok(request_id)
     }
 }
@@ -208,8 +161,7 @@ impl Config {
 pub struct Behaviour {
     config: Config,
     rx: mpsc::UnboundedReceiver<Command>,
-    pending_actions: VecDeque<ToSwarm<Event, THandlerInEvent<Self>>>,
-    events: VecDeque<Event>,
+    pending_events: VecDeque<ToSwarm<Event, ToHandler>>,
     pending_broadcasts: HashMap<u64, PendingBroadcast>,
 }
 
@@ -222,17 +174,27 @@ impl Behaviour {
             tx,
             next_request_id: Arc::new(AtomicU64::new(0)),
         };
-
         (
             Self {
                 config,
                 rx,
-                pending_actions: VecDeque::new(),
-                events: VecDeque::new(),
+                pending_events: VecDeque::new(),
                 pending_broadcasts: HashMap::new(),
             },
             handle,
         )
+    }
+
+    fn connection_handler_for_peer(&self, peer: PeerId) -> THandler<Self> {
+        if !self.config.p2p_context.is_known_peer(&peer) {
+            return Either::Right(dummy::ConnectionHandler);
+        }
+        Either::Left(Handler::new(
+            self.config.timeout,
+            self.config.verifier.clone(),
+            self.config.duty_gater.clone(),
+            peer,
+        ))
     }
 
     fn handle_command(&mut self, command: Command) {
@@ -245,7 +207,11 @@ impl Behaviour {
                 let message = match encode_message(&duty, &data_set) {
                     Ok(message) => message,
                     Err(err) => {
-                        self.broadcast_error(request_id, None, HandlerFailure::Codec(err));
+                        self.emit_broadcast_error(
+                            request_id,
+                            None,
+                            Failure::Codec(err.to_string()),
+                        );
                         return;
                     }
                 };
@@ -270,21 +236,21 @@ impl Behaviour {
                         .connections_to_peer(&peer)
                         .is_empty()
                     {
-                        self.broadcast_error(
+                        self.emit_broadcast_error(
                             request_id,
                             Some(peer),
-                            HandlerFailure::Io(format!("peer {peer} is not connected")),
+                            Failure::io(format!("peer {peer} is not connected")),
                         );
                         continue;
                     }
 
-                    self.pending_actions.push_back(ToSwarm::NotifyHandler {
+                    self.pending_events.push_back(ToSwarm::NotifyHandler {
                         peer_id: peer,
                         handler: NotifyHandler::Any,
-                        event: Either::Left(ToHandler::Send {
+                        event: ToHandler::Send {
                             request_id,
                             payload: message.clone(),
-                        }),
+                        },
                     });
                     targeted = targeted.saturating_add(1);
                 }
@@ -318,21 +284,60 @@ impl Behaviour {
                 .map(|entry| entry.failed)
                 .unwrap_or(failed);
             if failed {
-                self.events
-                    .push_back(Event::BroadcastFinished { request_id });
+                self.pending_events
+                    .push_back(ToSwarm::GenerateEvent(Event::BroadcastFailed {
+                        request_id,
+                    }));
             } else {
-                self.events
-                    .push_back(Event::BroadcastComplete { request_id });
+                self.pending_events
+                    .push_back(ToSwarm::GenerateEvent(Event::BroadcastComplete {
+                        request_id,
+                    }));
             }
         }
     }
 
-    fn broadcast_error(&mut self, request_id: u64, peer: Option<PeerId>, error: HandlerFailure) {
-        self.events.push_back(Event::BroadcastError {
-            request_id,
-            peer,
-            error,
-        });
+    fn emit_broadcast_error(&mut self, request_id: u64, peer: Option<PeerId>, error: Failure) {
+        self.pending_events
+            .push_back(ToSwarm::GenerateEvent(Event::BroadcastError {
+                request_id,
+                peer,
+                error,
+            }));
+    }
+
+    fn handle_handler_event(
+        &mut self,
+        peer_id: PeerId,
+        connection_id: ConnectionId,
+        event: FromHandler,
+    ) {
+        match event {
+            FromHandler::Received { duty, data_set } => {
+                self.pending_events
+                    .push_back(ToSwarm::GenerateEvent(Event::Received {
+                        peer: peer_id,
+                        connection: connection_id,
+                        duty,
+                        data_set,
+                    }));
+            }
+            FromHandler::InboundError(error) => {
+                self.pending_events
+                    .push_back(ToSwarm::GenerateEvent(Event::Error {
+                        peer: peer_id,
+                        connection: connection_id,
+                        error,
+                    }));
+            }
+            FromHandler::OutboundSuccess { request_id } => {
+                self.finish_broadcast_result(request_id, false);
+            }
+            FromHandler::OutboundError { request_id, error } => {
+                self.finish_broadcast_result(request_id, true);
+                self.emit_broadcast_error(request_id, Some(peer_id), error);
+            }
+        }
     }
 }
 
@@ -347,17 +352,7 @@ impl NetworkBehaviour for Behaviour {
         _local_addr: &Multiaddr,
         _remote_addr: &Multiaddr,
     ) -> std::result::Result<THandler<Self>, ConnectionDenied> {
-        if !self.config.p2p_context.is_known_peer(&peer) {
-            return Ok(Either::Right(dummy::ConnectionHandler));
-        }
-
-        tracing::trace!("establishing inbound connection to peer: {:?}", peer);
-        Ok(Either::Left(Handler::new(
-            self.config.timeout,
-            self.config.verifier.clone(),
-            self.config.duty_gater.clone(),
-            peer,
-        )))
+        Ok(self.connection_handler_for_peer(peer))
     }
 
     fn handle_established_outbound_connection(
@@ -368,17 +363,7 @@ impl NetworkBehaviour for Behaviour {
         _role_override: libp2p::core::Endpoint,
         _port_use: libp2p::core::transport::PortUse,
     ) -> std::result::Result<THandler<Self>, ConnectionDenied> {
-        if !self.config.p2p_context.is_known_peer(&peer) {
-            return Ok(Either::Right(dummy::ConnectionHandler));
-        }
-
-        tracing::trace!("establishing outbound connection to peer: {:?}", peer);
-        Ok(Either::Left(Handler::new(
-            self.config.timeout,
-            self.config.verifier.clone(),
-            self.config.duty_gater.clone(),
-            peer,
-        )))
+        Ok(self.connection_handler_for_peer(peer))
     }
 
     fn on_swarm_event(&mut self, _event: FromSwarm) {}
@@ -391,52 +376,25 @@ impl NetworkBehaviour for Behaviour {
     ) {
         let event = match event {
             Either::Left(event) => event,
-            Either::Right(value) => match value {},
+            Either::Right(unreachable) => match unreachable {},
         };
-
-        tracing::trace!("received connection handler event: {:?}", event);
-        match event {
-            FromHandler::Received { duty, data_set } => {
-                self.events.push_back(Event::Received {
-                    peer: peer_id,
-                    connection: connection_id,
-                    duty,
-                    data_set,
-                });
-            }
-            FromHandler::InboundError(error) => {
-                self.events.push_back(Event::Error {
-                    peer: peer_id,
-                    connection: connection_id,
-                    error,
-                });
-            }
-            FromHandler::OutboundSuccess { request_id } => {
-                self.finish_broadcast_result(request_id, false);
-            }
-            FromHandler::OutboundError { request_id, error } => {
-                self.finish_broadcast_result(request_id, true);
-                self.broadcast_error(request_id, Some(peer_id), error);
-            }
-        }
+        self.handle_handler_event(peer_id, connection_id, event);
     }
 
     fn poll(
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
-        tracing::trace!("polling parsigex behaviour");
-
-        if let Some(event) = self.events.pop_front() {
-            return Poll::Ready(ToSwarm::GenerateEvent(event));
+        if let Some(event) = self.pending_events.pop_front() {
+            return Poll::Ready(event.map_in(Either::Left));
         }
 
-        if let Poll::Ready(Some(command)) = self.rx.poll_recv(cx) {
+        while let Poll::Ready(Some(command)) = self.rx.poll_recv(cx) {
             self.handle_command(command);
         }
 
-        if let Some(action) = self.pending_actions.pop_front() {
-            return Poll::Ready(action);
+        if let Some(event) = self.pending_events.pop_front() {
+            return Poll::Ready(event.map_in(Either::Left));
         }
 
         Poll::Pending

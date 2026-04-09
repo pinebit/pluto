@@ -2,6 +2,7 @@
 
 use std::io;
 
+use futures::AsyncWriteExt;
 use libp2p::swarm::Stream;
 use prost::Message;
 
@@ -12,9 +13,6 @@ use pluto_core::{
 use pluto_p2p::proto;
 
 use super::{Error, Result as ParasigexResult};
-
-/// Maximum accepted message size.
-const MAX_MESSAGE_SIZE: usize = 16 * 1024 * 1024;
 
 /// Encodes a protobuf message to bytes.
 pub fn encode_protobuf<M: Message>(message: &M) -> Vec<u8> {
@@ -57,12 +55,16 @@ pub fn decode_message(bytes: &[u8]) -> ParasigexResult<(Duty, ParSignedDataSet)>
     Ok((duty, data_set))
 }
 
-/// Sends one protobuf message on the stream.
+/// Sends one protobuf message on the stream and closes the write side.
 pub async fn send_message(stream: &mut Stream, payload: &[u8]) -> io::Result<()> {
-    proto::write_length_delimited(stream, payload).await
+    proto::write_length_delimited(stream, payload).await?;
+    let _ = stream.close().await;
+    Ok(())
 }
 
-/// Receives one protobuf payload from the stream.
+/// Receives one protobuf payload from the stream and closes the write side.
 pub async fn recv_message(stream: &mut Stream) -> io::Result<Vec<u8>> {
-    proto::read_length_delimited(stream, MAX_MESSAGE_SIZE).await
+    let bytes = proto::read_length_delimited(stream, proto::MAX_MESSAGE_SIZE).await?;
+    let _ = stream.close().await;
+    Ok(bytes)
 }
