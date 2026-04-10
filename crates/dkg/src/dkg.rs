@@ -173,11 +173,11 @@ pub async fn run(conf: Config, shutdown: CancellationToken) -> Result<(), DkgErr
         return Err(DkgError::ShutdownRequestedBeforeStartup);
     }
 
-    validate_keymanager_flags(&conf)?;
-
     let eth1 = pluto_eth1wrap::EthClient::new(&conf.execution_engine_addr).await?;
 
     let _definition = crate::disk::load_definition(&conf, &eth1).await?;
+
+    validate_keymanager_flags(&conf)?;
 
     if !conf.has_test_config() {
         crate::disk::check_clear_data_dir(&conf.data_dir).await?;
@@ -248,8 +248,15 @@ mod tests {
 
     #[tokio::test]
     async fn run_rejects_mismatched_keymanager_flags() {
+        let (lock, ..) = pluto_cluster::test_cluster::new_for_test(1, 3, 4, 0);
+
         let err = run(
             Config::builder()
+                .test_config(
+                    TestConfig::builder()
+                        .def(lock.definition.clone())
+                        .build(),
+                )
                 .keymanager(
                     KeymanagerConfig::builder()
                         .address("https://keymanager.example".to_string())
