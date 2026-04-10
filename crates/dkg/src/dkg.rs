@@ -180,8 +180,8 @@ pub async fn run(conf: Config, shutdown: CancellationToken) -> Result<(), DkgErr
 }
 
 fn validate_keymanager_flags(conf: &Config) -> Result<(), DkgError> {
-    let addr = conf.keymanager.address.trim();
-    let auth_token = conf.keymanager.auth_token.trim();
+    let addr = conf.keymanager.address.as_str();
+    let auth_token = conf.keymanager.auth_token.as_str();
 
     if !addr.is_empty() && auth_token.is_empty() {
         return Err(DkgError::MissingKeymanagerAuthToken);
