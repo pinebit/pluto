@@ -95,6 +95,10 @@ pub enum Error {
     #[error("invalid signature for peer {0}")]
     InvalidSignature(PeerId),
 
+    /// The peer index in the message is out of range or matches the local node.
+    #[error("invalid peer index: {0}")]
+    InvalidPeerIndex(PeerId),
+
     /// The repeated hash for the same `(peer, msg_id)` differed.
     #[error("duplicate id with mismatching hash")]
     DuplicateMismatchingHash,
