@@ -7,6 +7,7 @@ use crate::{
     duration::Duration,
     error::{CliError, Result},
 };
+use libp2p::multiaddr::Protocol;
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
@@ -280,10 +281,8 @@ fn validate_p2p_args(args: &DkgP2PArgs) -> Result<()> {
     }
 
     for relay in &args.relays {
-        if relay.starts_with("http://") || relay.starts_with("https://") {
-            url::Url::parse(relay)
-                .map_err(|err| CliError::Other(format!("parse relay address: {relay}: {err}")))?;
-        }
+        parse_relay_addr(relay)
+            .map_err(|err| CliError::Other(format!("parse relay address: {relay}: {err}")))?;
     }
 
     Ok(())
@@ -291,7 +290,9 @@ fn validate_p2p_args(args: &DkgP2PArgs) -> Result<()> {
 
 fn warn_for_insecure_relays(relays: &[String]) {
     for relay in relays {
-        if relay.starts_with("http://") {
+        let multiaddr = parse_relay_addr(relay).expect("validated relay should parse");
+
+        if multiaddr.iter().any(|protocol| protocol == Protocol::Http) {
             warn!(address = %relay, "Insecure relay address provided, not HTTPS");
         }
     }
