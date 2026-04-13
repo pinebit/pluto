@@ -46,6 +46,10 @@ pub enum DkgError {
     /// Disk or definition preflight failed.
     #[error("DKG preflight failed: {0}")]
     Disk(#[from] crate::disk::DiskError),
+
+    /// Failed to verify keymanager connectivity.
+    #[error("verify keymanager address: {0}")]
+    Keymanager(#[from] pluto_eth2util::keymanager::KeymanagerError),
 }
 
 /// Keymanager configuration accepted by the entrypoint.
@@ -170,6 +174,7 @@ pub async fn run(conf: Config, shutdown: CancellationToken) -> Result<(), DkgErr
     let _definition = crate::disk::load_definition(&conf, &eth1).await?;
 
     validate_keymanager_flags(&conf)?;
+    verify_keymanager_connection(&conf).await?;
 
     if !conf.has_test_config() {
         crate::disk::check_clear_data_dir(&conf.data_dir).await?;
@@ -203,6 +208,19 @@ fn validate_keymanager_flags(conf: &Config) -> Result<(), DkgError> {
     if parsed.scheme() == "http" {
         warn!(addr = addr, "Keymanager URL does not use https protocol");
     }
+
+    Ok(())
+}
+
+async fn verify_keymanager_connection(conf: &Config) -> Result<(), DkgError> {
+    let addr = conf.keymanager.address.as_str();
+
+    if addr.is_empty() {
+        return Ok(());
+    }
+
+    let client = pluto_eth2util::keymanager::Client::new(addr, &conf.keymanager.auth_token)?;
+    client.verify_connection().await?;
 
     Ok(())
 }
@@ -254,6 +272,51 @@ mod tests {
         .expect_err("mismatched keymanager flags should fail");
 
         assert!(matches!(err, DkgError::MissingKeymanagerAuthToken));
+    }
+
+    #[tokio::test]
+    async fn verify_keymanager_connection_succeeds_for_reachable_address() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("listener should bind");
+        let addr = format!("http://{}", listener.local_addr().expect("local addr"));
+
+        let config = Config::builder()
+            .keymanager(
+                KeymanagerConfig::builder()
+                    .address(addr)
+                    .auth_token("token".to_string())
+                    .build(),
+            )
+            .build();
+
+        verify_keymanager_connection(&config)
+            .await
+            .expect("reachable keymanager should verify");
+    }
+
+    #[tokio::test]
+    async fn verify_keymanager_connection_fails_for_unreachable_address() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("listener should bind");
+        let addr = format!("http://{}", listener.local_addr().expect("local addr"));
+        drop(listener);
+
+        let config = Config::builder()
+            .keymanager(
+                KeymanagerConfig::builder()
+                    .address(addr)
+                    .auth_token("token".to_string())
+                    .build(),
+            )
+            .build();
+
+        let err = verify_keymanager_connection(&config)
+            .await
+            .expect_err("unreachable keymanager should fail");
+
+        assert!(matches!(err, DkgError::Keymanager(_)));
     }
 
     #[tokio::test]
