@@ -156,13 +156,14 @@ fn receive(
 
     let pubkey = peers[peer_idx].public_key()?;
 
-    let lock_hash_guard = lock_hash_rx.borrow();
-    let lock_hash = lock_hash_guard
-        .as_deref()
-        .ok_or(bcast::Error::MissingField("lock_hash"))?;
+    let lock_hash = {
+        let lock_hash_guard = lock_hash_rx.borrow();
+        lock_hash_guard
+            .clone()
+            .ok_or(bcast::Error::MissingField("lock_hash"))?
+    };
 
-    let verified = pluto_k1util::verify_65(&pubkey, lock_hash, msg.signature.as_ref())?;
-    if !verified {
+    if !pluto_k1util::verify_65(&pubkey, &lock_hash, msg.signature.as_ref())? {
         return Err(bcast::Error::InvalidSignature(peer_id));
     }
 
