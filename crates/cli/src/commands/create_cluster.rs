@@ -1487,6 +1487,55 @@ mod tests {
     );
     const DEFAULT_NETWORK: &str = "mainnet";
 
+    const TESTDATA_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/src/commands/testdata");
+
+    /// Returns the path for a golden file.
+    fn golden_path(test_name: &str, subtest: &str) -> std::path::PathBuf {
+        std::path::Path::new(TESTDATA_DIR).join(format!(
+            "test_create_cluster_{}_{}.golden",
+            test_name, subtest
+        ))
+    }
+
+    /// Compares `actual` against a golden file.
+    ///
+    /// Set `UPDATE_GOLDEN=1` in the environment to regenerate golden files.
+    fn require_golden_bytes(test_name: &str, subtest: &str, actual: &[u8]) {
+        let path = golden_path(test_name, subtest);
+        if std::env::var("UPDATE_GOLDEN").as_deref() == Ok("1") {
+            std::fs::create_dir_all(TESTDATA_DIR).unwrap();
+            std::fs::write(&path, actual).unwrap();
+            return;
+        }
+        let expected = std::fs::read(&path).unwrap_or_else(|_| {
+            panic!(
+                "golden file not found: {}. Run with UPDATE_GOLDEN=1 to create it.",
+                path.display()
+            )
+        });
+        assert_eq!(
+            String::from_utf8_lossy(actual),
+            String::from_utf8_lossy(&expected),
+            "golden file mismatch: {}",
+            path.display()
+        );
+    }
+
+    /// Serializes `data` as a JSON array with 1-space indent (matching Go's
+    /// `json.MarshalIndent(data, "", " ")`) and compares against a golden file.
+    fn require_golden_json(test_name: &str, subtest: &str, data: &[String]) {
+        let json = if data.is_empty() {
+            "[]".to_string()
+        } else {
+            let items: Vec<String> = data
+                .iter()
+                .map(|s| format!(" {}", serde_json::to_string(s).unwrap()))
+                .collect();
+            format!("[\n{}\n]", items.join(",\n"))
+        };
+        require_golden_bytes(test_name, subtest, json.as_bytes());
+    }
+
     #[derive(Debug, Clone)]
     struct TestCaseConfig {
         num_nodes: u64,
@@ -1747,6 +1796,56 @@ mod tests {
                 assert!(!sig.is_empty());
             }
         }
+
+        // --- Golden tests ---
+
+        // Extract the leaf test-case name from the thread name
+        // (e.g. "...::tests::simnet" → "simnet").
+        let test_name = std::thread::current()
+            .name()
+            .unwrap_or("")
+            .rsplit("::")
+            .next()
+            .unwrap_or("unknown")
+            .to_string();
+
+        // Output golden: replace the temp cluster-dir path with "pluto" to
+        // produce a deterministic, portable snapshot.
+        let abs_dir = std::path::absolute(dir.path()).unwrap();
+        let output_str = String::from_utf8(output).unwrap();
+        let output_replaced = output_str.replace(abs_dir.to_string_lossy().as_ref(), "pluto");
+        require_golden_bytes(&test_name, "output", output_replaced.as_bytes());
+
+        // Files golden: list cluster-dir contents two levels deep (sorted),
+        // L1 entries first then L2 entries — mirrors Go's
+        // `filepath.Glob(dir+"/*")` + `filepath.Glob(dir+"/*/*")`.
+        let mut l1: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .collect();
+        l1.sort_by_key(|e| e.file_name());
+
+        let mut files: Vec<String> = l1
+            .iter()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect();
+
+        for entry1 in &l1 {
+            let mut l2: Vec<_> = std::fs::read_dir(entry1.path())
+                .unwrap()
+                .filter_map(|e| e.ok())
+                .collect();
+            l2.sort_by_key(|e| e.file_name());
+            for entry2 in &l2 {
+                files.push(format!(
+                    "{}/{}",
+                    entry1.file_name().to_string_lossy(),
+                    entry2.file_name().to_string_lossy()
+                ));
+            }
+        }
+
+        require_golden_json(&test_name, "files", &files);
     }
 
     #[test_case::test_case(
